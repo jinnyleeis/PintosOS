@@ -88,6 +88,10 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+
+for (long long i = 0; i < 3000000000LL; i++){// 임시방편으로 바로 자식 프로세스 안죽도록
+};
+
   return -1;
 }
 
