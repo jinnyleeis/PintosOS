@@ -33,6 +33,9 @@ int write (int fd, const void *buffer, unsigned length);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
+// 추가 시스템 콜 프로토타입 추가
+int fibonacci(int n);
+int max_of_four_int(int x1, int x2, int x3, int x4);
 
 /* Project 3 and optionally project 4. */
 mapid_t mmap (int fd, void *addr);
