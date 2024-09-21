@@ -209,6 +209,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    Stores the executable's entry point into *EIP
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
+
+// 계속해서 건드려야 할 함수다!!!
 bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
@@ -226,7 +228,48 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
+  // 여기서 file_name에 할당된게 지금 이상한건듯 
+
+
+char *current_token=NULL;
+char *left_tokens=NULL;
+char **args;
+int num_args = 0;
+
+ // 첫 번째 토큰만 가져옴 
+ // current_token!=NULL이라는 조건을 가지고 while문을 돌리기 위해, 첫 번째 토큰은 밖에서 가져와야 한다!
+current_token = strtok_r(file_name, " ", &left_tokens); 
+
+
+char *file_name_copy = malloc(strlen(current_token) + 1);  // +1은 null 종결자 '\0' 위한 공간임 
+
+
+// Null 검사 이유? - 메모리 할당이 성공여부 확인하려고 
+if (file_name_copy != NULL) {
+    strlcpy(file_name_copy, current_token, strlen(current_token) + 1); 
+     // file_name을 안전하게 복사 
+     // 걍 복제없이 바로 복사해버리면, 나중에 while 문에서 current_token 업데이트 되므로 그러면 안된다
+     // 어짜피, 첫번째 토큰이  프로그램 이름일 것이므로, 이게 file_name 자리에 들어가야 맞다.
+    file_name = file_name_copy;  // 이제 file_name은 복사된 문자열을 가리키게 됨 
+}
+
+
+
+ // 나머지 인자들은, left_tokens 가지고 처리해주면 됨~!!
+ 
+ // 일단, num_args의 수가 무엇인지 확보한다. 
+ while (current_token != NULL) {
+    num_args++;                                // 토큰이 있으면 개수를 증가
+    current_token = strtok_r(NULL, " ", &left_tokens);    // 다음 토큰을 가져옴
+    printf("current_token : %s  ",current_token);
+}
+
+
+printf("Trying to load file: %s\n", file_name);
+
   file = filesys_open (file_name);
+
+  // echo x가 null로 인식되어서, 아래의 메시지가 출력된 것인듯 
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -319,7 +362,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_close (file);
   return success;
 }
-
+
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);
