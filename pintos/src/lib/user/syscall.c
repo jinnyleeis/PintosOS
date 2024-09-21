@@ -85,6 +85,7 @@
 
 
 
+// 플젝 1 - 0
 void
 halt (void) 
 {
@@ -92,6 +93,7 @@ halt (void)
   NOT_REACHED ();
 }
 
+// 플젝 1 -1 
 void
 exit (int status)
 {
@@ -99,78 +101,106 @@ exit (int status)
   NOT_REACHED ();
 }
 
+// 플젝 1 -2
 pid_t
 exec (const char *file)
 {
   return (pid_t) syscall1 (SYS_EXEC, file);
 }
 
+// 플젝 1 -3 
 int
 wait (pid_t pid)
 {
   return syscall1 (SYS_WAIT, pid);
 }
 
+// 4 
 bool
 create (const char *file, unsigned initial_size)
 {
   return syscall2 (SYS_CREATE, file, initial_size);
 }
 
+// 5 
 bool
 remove (const char *file)
 {
   return syscall1 (SYS_REMOVE, file);
 }
 
+// 6 
 int
 open (const char *file)
 {
   return syscall1 (SYS_OPEN, file);
 }
 
+// 7
 int
 filesize (int fd) 
 {
   return syscall1 (SYS_FILESIZE, fd);
 }
 
+// 플젝 1 - 8 
 int
 read (int fd, void *buffer, unsigned size)
 {
   return syscall3 (SYS_READ, fd, buffer, size);
 }
 
+// 플젝 1 -9 
 int
 write (int fd, const void *buffer, unsigned size)
 {
   return syscall3 (SYS_WRITE, fd, buffer, size);
 }
 
+// 10 
 void
 seek (int fd, unsigned position) 
 {
   syscall2 (SYS_SEEK, fd, position);
 }
 
+// 11
 unsigned
 tell (int fd) 
 {
   return syscall1 (SYS_TELL, fd);
 }
 
+// 12 
 void
 close (int fd)
 {
   syscall1 (SYS_CLOSE, fd);
 }
 
+// 13 
+int
+fibonacci (int n)
+{
+  return syscall1 (SYS_FIBONACCI, n);
+}
+
+// 14 
+int
+max_of_four_int (int x1, int x2, int x3, int x4)
+{
+  return syscall4 (SYS_MAX_OF_FOUR_INT, x1, x2, x3, x4);
+}
+
+
+// 프로젝트 3,4,라고 함!! - 지금 아님 - 유저 프로그램2까지 고려해서 여기서 끊장!! 
 mapid_t
 mmap (int fd, void *addr)
 {
   return syscall2 (SYS_MMAP, fd, addr);
 }
 
+//
 void
 munmap (mapid_t mapid)
 {

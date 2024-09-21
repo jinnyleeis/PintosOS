@@ -5,6 +5,7 @@
 enum 
   {
     /* Projects 2 and later. */
+    // 플젝 1에선 0,1,2,3,8,9,13,14를 구현해야 한다. 
     SYS_HALT,                   /* 0번 Halt the operating system. */
     SYS_EXIT,                   /* 1번 Terminate this process. */
     SYS_EXEC,                   /* 2번 Start another process. */
