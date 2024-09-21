@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+//implicit declaration of function ‘free’ , implicit declaration of function ‘malloc’ 해결
+#include "threads/malloc.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -17,6 +19,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -230,6 +233,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Open executable file. */
   // 여기서 file_name에 할당된게 지금 이상한건듯 
 
+  // 일단 이 이상한 full file name을 copy 할 필요가 있다..-에러뜸
+  // file_name이 const char *인데, strtok_r의 첫 번째 인수는 char *이어야 하므로, 코피 진행 
+  char *full_file_name_copy = malloc(strlen(file_name) + 1);  // file_name 복사본 생성
+  if (full_file_name_copy == NULL) 
+    goto done;  // 메모리 할당 실패 시 종료
+  strlcpy(full_file_name_copy, file_name, strlen(file_name) + 1);  // 안전하게 복사
+
+
+
 
 char *current_token=NULL;
 char *left_tokens=NULL;
@@ -238,21 +250,28 @@ int num_args = 0;
 
  // 첫 번째 토큰만 가져옴 
  // current_token!=NULL이라는 조건을 가지고 while문을 돌리기 위해, 첫 번째 토큰은 밖에서 가져와야 한다!
-current_token = strtok_r(file_name, " ", &left_tokens); 
+current_token = strtok_r(full_file_name_copy, " ", &left_tokens); 
+
+if (current_token == NULL)
+    goto done;  // 토큰이 없으면 종료
 
 
-char *file_name_copy = malloc(strlen(current_token) + 1);  // +1은 null 종결자 '\0' 위한 공간임 
 
+char *real_file_name_copy = malloc(strlen(current_token) + 1);  // +1은 null 종결자 '\0' 위한 공간임 
 
+if (real_file_name_copy == NULL){
+// 메모리 할당 실패 시
+    free(full_file_name_copy);  // 할당된 메모리 해제
+    goto done;  
+  }
 // Null 검사 이유? - 메모리 할당이 성공여부 확인하려고 
-if (file_name_copy != NULL) {
-    strlcpy(file_name_copy, current_token, strlen(current_token) + 1); 
+if (real_file_name_copy != NULL) {
+    strlcpy(real_file_name_copy, current_token, strlen(current_token) + 1); 
      // file_name을 안전하게 복사 
      // 걍 복제없이 바로 복사해버리면, 나중에 while 문에서 current_token 업데이트 되므로 그러면 안된다
      // 어짜피, 첫번째 토큰이  프로그램 이름일 것이므로, 이게 file_name 자리에 들어가야 맞다.
-    file_name = file_name_copy;  // 이제 file_name은 복사된 문자열을 가리키게 됨 
+    file_name = real_file_name_copy;  // 이제 file_name은 복사된 문자열을 가리키게 됨 
 }
-
 
 
  // 나머지 인자들은, left_tokens 가지고 처리해주면 됨~!!
@@ -360,6 +379,7 @@ printf("Trying to load file: %s\n", file_name);
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+
   return success;
 }
 
