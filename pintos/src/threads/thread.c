@@ -11,6 +11,9 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+// 새로 추가한 헤더!
+#include "threads/malloc.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -183,6 +186,40 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+
+//  새로운 스레드 t를 초기화하고 TID를 할당한 후에 추가 
+ /* 새로운 스레드 t의 TID가 할당된 후에 자식 프로세스 구조체를 초기화하기 위해 여기에 새로 추가함 */
+#ifdef USERPROG
+  /* Only add to parent's child list if parent exists */
+  if (thread_current() != NULL && thread_current() != initial_thread)
+  {
+    struct child_process *cp = malloc(sizeof(struct child_process));
+    if (cp == NULL)
+      return TID_ERROR;
+
+    cp->tid = tid;
+    cp->exit_status = -1;
+    cp->wait = false;
+    cp->exit = false;
+    cp->load_success = false;
+    sema_init(&cp->wait_sema, 0);
+    sema_init(&cp->load_sema, 0);
+
+    /* Add to parent's child list */
+    list_push_back(&thread_current()->child_list, &cp->elem);
+
+    /* Set child's parent */
+    t->parent = thread_current();
+  }
+  else
+  {
+    /* No valid parent, set parent to NULL */
+    t->parent = NULL;
+  }
+#endif
+
+
+
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -292,6 +329,13 @@ thread_exit (void)
   intr_disable ();
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
+
+
+    /* 부모 포인터 초기화 */
+    thread_current()->parent = NULL;
+
+
+
   schedule ();
   NOT_REACHED ();
 }
@@ -424,7 +468,8 @@ kernel_thread (thread_func *function, void *aux)
   function (aux);       /* Execute the thread function. */
   thread_exit ();       /* If function() returns, kill the thread. */
 }
-
+
+
 /* Returns the running thread. */
 struct thread *
 running_thread (void) 
@@ -463,6 +508,15 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+
+    /* 여기에 부모 스레드 설정 부분 추가 */
+#ifdef USERPROG
+list_init(&t->child_list); // child_list 초기화
+if (t == initial_thread)
+    t->parent = NULL; // 초기 스레드는 부모가 없음
+else
+    t->parent = thread_current(); // 부모를 현재 스레드로 설정
+#endif
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

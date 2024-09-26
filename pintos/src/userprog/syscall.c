@@ -8,6 +8,9 @@
 #include "devices/shutdown.h"
 #include "devices/input.h"
 #include "threads/synch.h" // sema_down, sema_up 포함
+// 새로 추가
+#include "userprog/pagedir.h"
+
 
 static void syscall_handler (struct intr_frame *);
 void halt (void) NO_RETURN;
@@ -18,6 +21,17 @@ int wait (tid_t);
 tid_t exec (const char *file);
 //void check_user_vaddr(const void *vaddr);
 void check_valid_vaddr(uint32_t *esp, int n);
+static void validate_user_pointer(const void *ptr);
+
+
+static void validate_user_pointer(const void *ptr)
+{
+    if (ptr == NULL || !is_user_vaddr(ptr) || pagedir_get_page(thread_current()->pagedir, ptr) == NULL)
+    {
+        exit(-1);
+    }
+}
+
 
 // 사용자 주소 유효성 확인 함수
 
@@ -71,6 +85,48 @@ static void syscall_handler (struct intr_frame *f UNUSED) {
   //ASSERT(f->esp != NULL);
   //ASSERT(is_user_vaddr(f->esp));  // 사용자 영역 주소인지 확인
 
+
+
+  uint32_t *esp = (uint32_t *) f->esp;
+
+  printf("system call!");
+
+    validate_user_pointer(esp);
+    int syscall_number = esp[0];
+
+
+  switch (syscall_number)
+    {
+        case SYS_HALT:
+            halt();
+            break;
+        case SYS_WRITE:
+        // fd, buffer, size 인자에 대한 유효성 검사 필요
+          //  validate_user_pointer((const void *)esp[5]);  // buffer 포인터의 유효성 검사
+          //  f->eax = write((int)esp[1], (const void *)esp[2], (unsigned)esp[3]);
+
+           write((int)*(uint32_t *)(f->esp + 4), (void *)*(uint32_t *)(f->esp + 8), (unsigned)*(uint32_t *)(f->esp + 12));
+            break;   
+        case SYS_EXIT:
+          //  exit((int)esp[1]);
+          // f->eax = exec((const char *)esp[1]);
+            exit((int)esp[1]);
+            break;
+        case SYS_EXEC:
+          //  f->eax = exec(esp);
+          validate_user_pointer((const void *)esp[1]);  // 포인터 유효성 검사
+          f->eax = exec((const char *)esp[1]);
+            break;
+        case SYS_WAIT:
+            f->eax = process_wait((tid_t)esp[1]);
+            break;
+        /* 다른 시스템 콜 처리 */
+        default:
+            exit(-1);
+            break;
+    }
+
+/*
   switch (*(uint32_t *)(f->esp)) {
     case SYS_HALT:
       halt();
@@ -94,6 +150,8 @@ static void syscall_handler (struct intr_frame *f UNUSED) {
     default:
       break;
   }
+
+  */
 }
 
 void halt (void) {
@@ -101,8 +159,14 @@ void halt (void) {
 }
 
 void exit (int status) {
+  /*
   printf("%s: exit(%d)\n", thread_name(), status);
   thread_exit ();
+  */
+   struct thread *cur = thread_current();
+    cur->exit_status = status;
+    printf("%s: exit(%d)\n", cur->name, status);
+    thread_exit();
 }
 
 int write (int fd, const void *buffer, unsigned length) {
@@ -113,4 +177,23 @@ int write (int fd, const void *buffer, unsigned length) {
   return -1; 
 }
 
+tid_t exec(const char *cmd_line) {
+    validate_user_pointer(cmd_line); // 포인터 유효성 검사
+
+    tid_t tid = process_execute(cmd_line);
+    if (tid == TID_ERROR)
+        return -1;
+
+struct child_process *cp = get_child_process(thread_current(), tid);
+    if (cp == NULL)
+        return -1;
+
+    /* 자식 프로세스의 로드 완료 대기 */
+    sema_down(&cp->load_sema);
+
+    if (!cp->load_success)
+        return -1;
+
+    return tid;
+}
 

@@ -26,6 +26,28 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 /* construct_esp 함수의 선언을 load 함수 위에 추가 */
 void construct_esp(char *file_name, void **esp);
 
+// 추가 구현 함수 - 자식 프로세스 관리용 
+struct child_process* get_child_process(struct thread *t, tid_t tid) {
+    struct list_elem *e;
+
+    for (e = list_begin(&t->child_list); e != list_end(&t->child_list); e = list_next(e)) {
+        struct child_process *cp = list_entry(e, struct child_process, elem);
+        if (cp->tid == tid) {
+            return cp;
+        }
+    }
+    return NULL; // 자식 프로세스를 찾지 못함
+}
+
+
+void remove_child_process(struct child_process *cp) {
+    if (cp != NULL) {
+        list_remove(&cp->elem);
+        free(cp);
+    }
+}
+
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -44,7 +66,7 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
  // printf("exit(%d)\n", status);
-
+/*
 const char *full_name = file_name;  // 전체 이름을 저장할 포인터
 int first_word_length = strcspn(full_name, " ");  // 공백까지의 길이 계산
 
@@ -55,10 +77,45 @@ strlcpy(first_word, full_name, first_word_length + 1);  // +1은 NULL 문자 포
    
 
   /* Create a new thread to execute FILE_NAME. */
+  /*
   tid = thread_create (first_word, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
+
+  */
+
+
+    /* 프로그램 이름 추출 */
+    char *save_ptr;
+    char *prog_name = strtok_r(fn_copy, " ", &save_ptr);
+
+    /* 새로운 스레드 생성 */
+    tid = thread_create(prog_name, PRI_DEFAULT, start_process, fn_copy);
+    if (tid == TID_ERROR)
+    {
+        palloc_free_page(fn_copy);
+        return tid;
+    }
+
+    /* child_process 구조체 생성 및 부모의 child_list에 추가 */
+    struct child_process *cp = malloc(sizeof(struct child_process));
+    if (cp == NULL)
+        return TID_ERROR;
+
+    cp->tid = tid;
+    cp->exit_status = -1;
+    cp->wait = false;
+    cp->exit = false;
+    cp->load_success = false;
+    sema_init(&cp->wait_sema, 0);
+    sema_init(&cp->load_sema, 0);
+
+    list_push_back(&thread_current()->child_list, &cp->elem);
+
+        return tid;  // 반환값
+
+
 }
 
 /* A thread function that loads a user process and starts it
@@ -76,6 +133,19 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+
+    /* 부모에게 로드 완료를 알림 */
+    struct thread *cur = thread_current();
+    if (cur->parent)
+    {
+        struct child_process *cp = get_child_process(cur->parent, cur->tid);
+        if (cp != NULL)
+        {
+            cp->load_success = success;
+            sema_up(&cp->load_sema);
+        }
+    }
+
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -105,10 +175,32 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
 
+/*
 for (long long i = 0; i < 3000000000LL; i++){// 임시방편으로 바로 자식 프로세스 안죽도록
 };
 
   return -1;
+  */
+  
+struct child_process *cp = get_child_process(thread_current(), child_tid);
+
+    if (cp == NULL)
+        return -1; // 해당 자식 프로세스가 없음
+
+    if (cp->wait)
+        return -1; // 이미 wait 호출됨
+
+    cp->wait = true;
+
+    if (!cp->exit)
+        sema_down(&cp->wait_sema); // 자식 프로세스가 종료될 때까지 대기
+
+    int status = cp->exit_status;
+    remove_child_process(cp); // 자식 프로세스 구조체 제거
+
+    return status;
+
+
 }
 
 /* Free the current process's resources. */
@@ -134,6 +226,29 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+   /* 부모에게 종료 상태를 알림 */
+    if (cur->parent)
+    {
+        struct child_process *cp = get_child_process(cur->parent, cur->tid);
+        if (cp != NULL)
+        {
+            cp->exit_status = cur->exit_status;
+            cp->exit = true;
+            sema_up(&cp->wait_sema); // 부모에게 신호
+        }
+    }
+
+
+
+    /* 자식 프로세스 구조체들 정리 */
+    struct list_elem *e;
+    while (!list_empty(&cur->child_list))
+    {
+        e = list_pop_front(&cur->child_list);
+        struct child_process *cp = list_entry(e, struct child_process, elem);
+        remove_child_process(cp);
+    }
 }
 
 /* Sets up the CPU for running user code in the current
@@ -151,7 +266,8 @@ process_activate (void)
      interrupts. */
   tss_update ();
 }
-
+
+
 /* We load ELF binaries.  The following definitions are taken
    from the ELF specification, [ELF1], more-or-less verbatim.  */
 
@@ -395,7 +511,7 @@ void construct_esp(char *file_name, void **esp) {
   *(uint32_t *)(*esp) = 0;
 
   /* Dump the stack for debugging */
- // hex_dump((uintptr_t) *esp, *esp, (size_t) (PHYS_BASE - (uintptr_t) *esp), true);
+  hex_dump((uintptr_t) *esp, *esp, (size_t) (PHYS_BASE - (uintptr_t) *esp), true);
 
 
 }

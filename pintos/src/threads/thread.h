@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -80,6 +81,9 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+
+// 부모 프로세스가 자신의 자식 프로세스들을 관리하기 위해 struct thread에 자식 프로세스 리스트를 추가
 struct thread
   {
     /* Owned by thread.c. */
@@ -96,6 +100,10 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    // 이거 밑에다가 유저 프로세스에 해당하는 것들 
+    struct list child_list;             /* 자식 프로세스 리스트 */
+    struct thread *parent;              /* 부모 프로세드의 포인터 */
+    int exit_status;                    /* 종료 상태 */
 #endif
 
     /* Owned by thread.c. */
