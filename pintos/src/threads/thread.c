@@ -70,6 +70,31 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+// 새로 추가 
+struct thread *get_thread_by_tid(tid_t tid);
+
+
+// 새로 추가 함수
+/* why? Pintos는 모든 스레드를 all_list라는 리스트로 관리하기 떄문에,
+특정 TID를 가진 스레드를 찾으려면 이 리스트를 순회해야한다. 
+process_execute(), process_wait(), exec(), wait() 등의 함수에서 자식 스레드를 찾을 때 사용함
+input : tid_t tid  - 찾고자 하는 스레드의 식별자
+해당 tid를 가진 스레드의 포인터를 반환
+*/
+struct thread *get_thread_by_tid(tid_t tid)
+{
+  struct list_elem *e;
+
+  /* 모든 스레드를 포함하는 all_list를 순회 */
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
+  {
+    struct thread *t = list_entry(e, struct thread, allelem);
+    if (t->tid == tid)
+      return t;  // 해당 tid를 가진 스레드를 찾으면 반환
+  }
+  return NULL;  // 찾지 못하면 NULL 반환
+}
+
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -84,6 +109,8 @@ static tid_t allocate_tid (void);
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+
 void
 thread_init (void) 
 {

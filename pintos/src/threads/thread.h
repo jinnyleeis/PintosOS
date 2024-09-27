@@ -96,6 +96,12 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    int exit_status;                /* 종료 상태 */
+    struct semaphore load_sema;     /* 로드 동기화를 위한 세마포어 */
+    struct semaphore exit_sema;     /* 종료 동기화를 위한 세마포어 */
+    struct thread *parent;          /* 부모 스레드 */
+    struct list_elem child_elem;    /* 자식 리스트의 요소 */
+    struct list child_list;         /* 자식 스레드 리스트 */
 #endif
 
     /* Owned by thread.c. */
@@ -137,5 +143,8 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+// 새로 추가
+struct thread *get_thread_by_tid(tid_t tid);
 
 #endif /* threads/thread.h */
