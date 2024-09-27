@@ -84,6 +84,13 @@ static void syscall_handler(struct intr_frame *f UNUSED) {
             check_valid_vaddr(f->esp + 12); // size
             f->eax = read((int)*(uint32_t *)(f->esp + 4), (void *)*(uint32_t *)(f->esp + 8), (unsigned)*(uint32_t *)(f->esp + 12));
             break;
+        case SYS_FIBONACCI:
+            f->eax = fibonacci(*(int *)(f->esp + 4));
+            break;
+        case SYS_MAX_OF_FOUR_INT:
+            f->eax = max_of_four_int(*(int *)(f->esp + 4), *(int *)(f->esp + 8),
+                                    *(int *)(f->esp + 12), *(int *)(f->esp + 16));
+            break;
         default:
             exit(-1); // 잘못된 시스템 콜 번호의 경우 프로세스 종료
             break;
