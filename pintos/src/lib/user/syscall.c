@@ -187,9 +187,9 @@ fibonacci (int n)
 
 // 14 
 int
-max_of_four_int (int x1, int x2, int x3, int x4)
+max_of_four_int (int a, int b, int c, int d)
 {
-  return syscall4 (SYS_MAX_OF_FOUR_INT, x1, x2, x3, x4);
+  return syscall4 (SYS_MAX_OF_FOUR_INT, a, b, c, d);
 }
 
 
