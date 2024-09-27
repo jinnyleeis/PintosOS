@@ -86,7 +86,8 @@ static void syscall_handler (struct intr_frame *f UNUSED) {
      // f->eax = exec((const char *)*(uint32_t *)(f->esp + 4));
       break; 
     case SYS_WAIT:
-    //  f->eax = wait((tid_t)*(uint32_t *)(f->esp + 4));
+     f->eax = wait((tid_t)*(uint32_t *)(f->esp + 4));
+
       break;
     case SYS_READ:
     //  f->eax = read((int)*(uint32_t *)(f->esp + 4), (void *)*(uint32_t *)(f->esp + 8), (unsigned)*(uint32_t *)(f->esp + 12));
@@ -113,3 +114,7 @@ int write (int fd, const void *buffer, unsigned length) {
   return -1; 
 }
 
+
+int wait(tid_t tid) {
+    return process_wait(tid);
+}
