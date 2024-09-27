@@ -4,6 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"   // 세마포어 사용을 위해 추가
+
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -101,7 +103,7 @@ struct thread
     struct semaphore exit_sema;     /* 종료 동기화를 위한 세마포어 */
     struct thread *parent;          /* 부모 스레드 */
     struct list_elem child_elem;    /* 자식 리스트의 요소 */
-    struct list child_list;         /* 자식 스레드 리스트 */
+    struct list child_list;         /* Child thread list */
 #endif
 
     /* Owned by thread.c. */

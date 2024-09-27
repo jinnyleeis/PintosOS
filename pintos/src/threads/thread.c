@@ -13,6 +13,8 @@
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "threads/synch.h"   // 세마포어 사용을 위해 추가
+
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -499,12 +501,19 @@ init_thread (struct thread *t, const char *name, int priority)
 // 자식 스레드 생성시, 부모-자식간 동기화 위한 세마포어 초기화 
   sema_init(&t->load_sema, 0);
   sema_init(&t->exit_sema, 0);
-// 현재 스레드를 자식 스레드의 부모로 설정 
-  t->parent = thread_current();
+
   // 자식 스레드 리스트 초기화 
   list_init(&t->child_list);
-  // thread_create()로 생성한 스레드는 부모 스레드의 자식 리스트에 추가
-  list_push_back(&t->parent->child_list, &t->child_elem);
+
+ if (t != initial_thread) {
+    /* 현재 스레드를 자식 스레드의 부모로 설정 */
+    t->parent = thread_current();
+    /* 부모 스레드의 자식 리스트에 자신을 추가 */
+    list_push_back(&t->parent->child_list, &t->child_elem);
+  } else {
+    /* initial_thread의 경우 부모가 없으므로 NULL로 설정 */
+    t->parent = NULL;
+  }
 
 }
 
