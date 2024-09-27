@@ -191,3 +191,33 @@ tid_t exec(const char *file) {
 
     return pid;
     }
+
+// 추가 구현 함수 2개 !!
+/* 동적 프로그래밍으로 구현한 dp */
+int fibonacci(int n) {
+  if (n <= 1)
+    return n;
+
+  // DP 배열 생성
+  int fib[n + 1];
+
+  // 초기값 설정
+  fib[0] = 0;
+  fib[1] = 1;
+
+  // bottom-up 방식으로 Fibonacci 수 계산
+  for (int i = 2; i <= n; i++) {
+    fib[i] = fib[i - 1] + fib[i - 2];
+  }
+
+  // n번째 Fibonacci 수 반환
+  return fib[n];
+}
+
+int max_of_four_int(int a, int b, int c, int d) {
+  int max = a;
+  if (b > max) max = b;
+  if (c > max) max = c;
+  if (d > max) max = d;
+  return max;
+}
