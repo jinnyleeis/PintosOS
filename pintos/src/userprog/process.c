@@ -77,6 +77,12 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+    struct thread *cur = thread_current();
+    cur->load_success = success;
+
+    /* 부모에게 로드 완료를 알림 */
+    sema_up(&cur->load_sema);
+
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
@@ -113,6 +119,7 @@ for (long long i = 0; i < 3000000000LL; i++){// 임시방편으로 바로 자식
 
   return -1;*/
 /**/
+
     struct thread *cur = thread_current();
     struct thread *child = get_thread_by_tid(child_tid);
 
@@ -128,6 +135,7 @@ for (long long i = 0; i < 3000000000LL; i++){// 임시방편으로 바로 자식
     list_remove(&child->child_elem);
 
     return exit_status;
+
 
 }
 
@@ -153,7 +161,12 @@ process_exit (void)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
+
     }
+
+    /* 부모에게 종료를 알림 */
+       // printf("%s: exit(%d)\n", thread_name(), cur->exit_status);
+    sema_up(&cur->exit_sema);
 }
 
 /* Sets up the CPU for running user code in the current
@@ -415,7 +428,7 @@ void construct_esp(char *file_name, void **esp) {
   *(uint32_t *)(*esp) = 0;
 
   /* Dump the stack for debugging */
- // hex_dump((uintptr_t) *esp, *esp, (size_t) (PHYS_BASE - (uintptr_t) *esp), true);
+  hex_dump((uintptr_t) *esp, *esp, (size_t) (PHYS_BASE - (uintptr_t) *esp), true);
 
 
 }

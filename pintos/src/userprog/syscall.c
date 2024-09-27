@@ -8,6 +8,8 @@
 #include "devices/shutdown.h"
 #include "devices/input.h"
 #include "threads/synch.h" // sema_down, sema_up 포함
+#include "userprog/pagedir.h"  // pagedir_get_page 함수 사용을 위해 포함
+
 
 static void syscall_handler (struct intr_frame *);
 void halt (void) NO_RETURN;
@@ -16,8 +18,24 @@ void exit (int status) NO_RETURN;
 int read (int fd, void *buffer, unsigned length);
 int wait (tid_t);
 tid_t exec (const char *file);
-//void check_user_vaddr(const void *vaddr);
-void check_valid_vaddr(uint32_t *esp, int n);
+//void check_valid_vaddr(uint32_t *esp, int n);
+void check_user_vaddr(const void *vaddr);  // 유효성 검사 함수
+
+/* 사용자 주소 유효성 확인 함수 */
+void check_user_vaddr(const void *vaddr) {
+    if (!is_user_vaddr(vaddr) || pagedir_get_page(thread_current()->pagedir, vaddr) == NULL) {
+        exit(-1);  // 유효하지 않은 포인터는 exit(-1)로 프로세스 종료
+    }
+}
+
+void check_valid_vaddr(const void *vaddr);  // 유효성 검사 함수
+
+/* 사용자 주소 유효성 확인 함수 */
+void check_valid_vaddr(const void *vaddr) {
+    if (!is_user_vaddr(vaddr) || pagedir_get_page(thread_current()->pagedir, vaddr) == NULL) {
+        exit(-1);  // 유효하지 않은 포인터는 exit(-1)로 프로세스 종료
+    }
+}
 
 // 사용자 주소 유효성 확인 함수
 
@@ -43,6 +61,8 @@ esp[i]가 0x08048000이라면, 이를 is_user_vaddr()에 전달할 때 (void *) 
 이 값을 is_user_vaddr() 함수에 전달할 때 포인터로 캐스팅함 
 
 */
+/*
+
 void check_valid_vaddr(uint32_t *esp, int n) {
     for (int i = 0; i <= n; ++i) {
         // 명시적 형변환을 통해 부호 없는 32비트 정수로 변환
@@ -52,6 +72,16 @@ void check_valid_vaddr(uint32_t *esp, int n) {
         }
     }
 }
+*/
+
+/*
+void check_valid_vaddr(const void *vaddr) {
+    if (!is_user_vaddr(vaddr) || pagedir_get_page(thread_current()->pagedir, vaddr) == NULL) {
+        exit(-1);  // 유효하지 않은 포인터는 exit(-1)로 프로세스 종료
+    }
+}
+*/
+
 
 /*
 void check_user_vaddr (const void *vaddr) {
@@ -67,10 +97,64 @@ void syscall_init (void) {
 
 static void syscall_handler (struct intr_frame *f UNUSED) {
 
+    /* esp가 가리키는 주소가 유효한지 먼저 검사 */
+  check_user_vaddr(f->esp);
+
+  /* 시스템 호출 번호를 가져옴 */
+  uint32_t syscall_number = *(uint32_t *)(f->esp);
+
+  /* esp에서 전달되는 파라미터에 대한 유효성 검사 및 호출 */
+  switch (syscall_number) {
+    case SYS_HALT:
+      halt();
+      break;
+
+    case SYS_EXIT:
+      /* status 파라미터에 대한 유효성 검사 */
+      check_user_vaddr((f->esp + 4));
+      exit(*(uint32_t *)(f->esp + 4));
+      break;
+
+    case SYS_EXEC:
+      /* cmd_line 파라미터에 대한 유효성 검사 */
+      check_user_vaddr((f->esp + 4));
+      f->eax = exec((const char *)*(uint32_t *)(f->esp + 4));
+      break;
+
+    case SYS_WAIT:
+      /* pid 파라미터에 대한 유효성 검사 */
+      check_user_vaddr(f->esp + 4);
+      f->eax = wait((tid_t)*(uint32_t *)(f->esp + 4));
+      break;
+
+    case SYS_READ:
+      /* read 함수의 fd, buffer, size 파라미터에 대한 유효성 검사 */
+      check_user_vaddr(f->esp + 20);  // fd
+      check_user_vaddr(f->esp + 24);  // buffer
+      check_user_vaddr(f->esp + 28);  // size
+      f->eax = read((int)*(uint32_t *)(f->esp + 20), (void *)*(uint32_t *)(f->esp + 24), (unsigned)*(uint32_t *)(f->esp + 28));
+      break;
+
+    case SYS_WRITE:
+      /* write 함수의 fd, buffer, size 파라미터에 대한 유효성 검사 */
+      check_user_vaddr(f->esp + 4);  // fd
+      check_user_vaddr(f->esp + 8);  // buffer
+      check_user_vaddr(f->esp + 12);  // size
+      f->eax = write((int)*(uint32_t *)(f->esp + 4), (const void *)*(uint32_t *)(f->esp + 8), (unsigned)*(uint32_t *)(f->esp + 12));
+      break;
+
+    default:
+      /* 처리되지 않은 시스템 호출 번호 */
+      printf("Unknown system call: %d\n", syscall_number);
+      thread_exit();
+      break;
+  }
+
   // esp가 유효한 주소인지 체크
   //ASSERT(f->esp != NULL);
   //ASSERT(is_user_vaddr(f->esp));  // 사용자 영역 주소인지 확인
 
+/*
   switch (*(uint32_t *)(f->esp)) {
     case SYS_HALT:
       halt();
@@ -84,9 +168,16 @@ static void syscall_handler (struct intr_frame *f UNUSED) {
     case SYS_EXEC:
      // check_user_vaddr(f->esp + 4);
      // f->eax = exec((const char *)*(uint32_t *)(f->esp + 4));
+     //  check_valid_vaddr(f->esp, 1);
+    //   f->eax = exec((const char *)(f->esp + 4));
+  //  f->eax = exec((const char *)*((uint32_t *)f->esp + 1));
+
       break; 
     case SYS_WAIT:
-     f->eax = wait((tid_t)*(uint32_t *)(f->esp + 4));
+   // check_valid_vaddr(f->esp, 1);
+  //   f->eax = wait((tid_t)*(uint32_t *)(f->esp + 4));
+ // f->eax = wait((tid_t)*((uint32_t *)f->esp + 1));
+
 
       break;
     case SYS_READ:
@@ -95,6 +186,38 @@ static void syscall_handler (struct intr_frame *f UNUSED) {
     default:
       break;
   }
+
+  
+  /*
+    uint32_t *esp = (uint32_t *)f->esp;
+    check_valid_vaddr(esp); // esp 유효성 검사
+
+    switch (*esp) {
+        case SYS_HALT:
+            halt();
+            break;
+        case SYS_WRITE:
+            check_valid_vaddr(esp + 1);
+            check_valid_vaddr((const void *)*(esp + 2));
+            f->eax = write((int)*(esp + 1), (const void *)*(esp + 2), (unsigned)*(esp + 3));
+            break;
+        case SYS_EXIT:
+            check_valid_vaddr(esp + 1);
+            exit((int)*(esp + 1));
+            break;
+        case SYS_EXEC:
+            check_valid_vaddr(esp + 1);
+            f->eax = exec((const char *)*(esp + 1));
+            break;
+        case SYS_WAIT:
+            check_valid_vaddr(esp + 1);
+            f->eax = wait((tid_t)*(esp + 1));
+            break;
+        default:
+            break;
+    }*/
+
+
 }
 
 void halt (void) {
@@ -102,6 +225,8 @@ void halt (void) {
 }
 
 void exit (int status) {
+  struct thread *cur = thread_current();
+  cur->exit_status = status;  // 종료 상태 설정
   printf("%s: exit(%d)\n", thread_name(), status);
   thread_exit ();
 }
@@ -117,4 +242,25 @@ int write (int fd, const void *buffer, unsigned length) {
 
 int wait(tid_t tid) {
     return process_wait(tid);
+}
+
+
+tid_t exec(const char *cmd_line) {
+  if (cmd_line == NULL || !is_user_vaddr(cmd_line))
+        exit(-1);
+
+    tid_t tid = process_execute(cmd_line);
+
+    if (tid == TID_ERROR)
+        return -1;
+
+    struct thread *child = get_thread_by_tid(tid);
+
+    /* 자식 프로세스의 로드 완료 대기 */
+    sema_down(&child->load_sema);
+
+    if (!child->load_success)
+        return -1;
+
+    return tid;
 }
