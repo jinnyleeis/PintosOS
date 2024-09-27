@@ -76,6 +76,11 @@ strlcpy(first_word, full_name, first_word_length + 1);  // +1은 NULL 문자 포
   tid = thread_create (first_word, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+
+
+
+
+
   return tid;
 }
 
@@ -97,8 +102,16 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+  if (!success){
+      thread_current()->exit_status = -1;  // 로드 실패 상태 설정
+      sema_up(&thread_current()->load_sema);  // 부모에게 로드 실패 알림
+      exit(-1);  // 명시적으로 exit(-1)을 호출하여 종료
+
+    }
+
+
+      // 로드 성공 시 부모에게 알림
+    sema_up(&thread_current()->load_sema);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

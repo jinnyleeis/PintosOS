@@ -179,5 +179,22 @@ int read(int fd, void *buffer, unsigned size) {
 }
 
 tid_t exec(const char *file) {
-    return process_execute(file);
-}
+  tid_t pid = process_execute(file);  // 새로운 프로세스 생성 및 실행
+
+    struct thread *child = get_child_thread_by_tid(thread_current(), pid);
+
+    // 자식 스레드가 NULL이면 -1 반환
+    if (child == NULL) {
+        return -1;
+    }
+
+    // 자식이 로드를 완료할 때까지 대기
+    sema_down(&child->load_sema);
+
+    // 로드 실패 시 -1 반환
+    if (child->exit_status == -1) {
+        return -1;
+    }
+
+    return pid;
+    }
