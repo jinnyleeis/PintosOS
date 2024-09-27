@@ -135,17 +135,21 @@ process_wait (tid_t child_tid UNUSED)
     struct thread *cur = thread_current();
     struct thread *child = get_thread_by_tid(child_tid);
 
-    if (child == NULL || child->parent != cur)
-        return -1;
+    if (child == NULL || child->parent != cur){return -1; // 자식이 유효하지 않을 경우 -1 반환
+    }
 
-/* 자식 프로세스가 종료될 때까지 대기 */
-  if (!child->exited) {
-    sema_down(&child->exit_sema);
-  }
+
+
+        sema_down(&child->exit_sema);
+    
 
     /* 자식의 종료 상태 반환 */
   int exit_status = child->exit_status;
   list_remove(&child->child_elem);
+
+   /* 자식에게 이제 완전히 종료해도 된다고 알림 */
+    sema_up(&child->wait_sema);
+    
   return exit_status;
     /* 자식 프로세스가 종료될 때까지 대기 */
    // sema_down(&child->exit_sema);
@@ -200,7 +204,8 @@ process_activate (void)
      interrupts. */
   tss_update ();
 }
-
+
+
 /* We load ELF binaries.  The following definitions are taken
    from the ELF specification, [ELF1], more-or-less verbatim.  */
 

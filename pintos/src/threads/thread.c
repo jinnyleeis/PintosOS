@@ -214,6 +214,7 @@ thread_create (const char *name, int priority,
 
     /* 스레드 생성 시 종료되지 않은 상태로 초기화 */
   t->exited = false;
+   t->wrong_exit = false;
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -504,6 +505,8 @@ init_thread (struct thread *t, const char *name, int priority)
 // 자식 스레드 생성시, 부모-자식간 동기화 위한 세마포어 초기화 
   sema_init(&t->load_sema, 0);
   sema_init(&t->exit_sema, 0);
+  sema_init(&t->wait_sema, 0);  // 부모가 자식을 정리하는 동안 기다리는 세마포어
+
 
   // 자식 스레드 리스트 초기화 
   list_init(&t->child_list);

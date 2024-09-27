@@ -8,4 +8,8 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (void);
 
+// process.h 파일 내 추가
+struct thread *get_child_thread_by_tid(struct thread *parent, tid_t child_tid);
+
+
 #endif /* userprog/process.h */

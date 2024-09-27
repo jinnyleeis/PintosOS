@@ -97,21 +97,48 @@ void halt(void) {
 void exit(int status) {
 
  struct thread *cur = thread_current();
+
+   
+
     
     // 이미 종료된 상태라면 중복 출력 방지
     if (!cur->exited) {
         // 상태를 종료로 표시
         cur->exited = true;
-
-        printf("%s: exit(%d)\n", thread_name(), status);
         cur->exit_status = status;
+
+if(!cur->wrong_exit){
+        printf("%s: exit(%d)\n", thread_name(), status);
+        }
+
+
+     /* 부모 스레드가 자식의 종료를 기다리는 경우, 종료를 알림 */
+      sema_up(&cur->exit_sema);
+
+       /* 부모가 자식을 정리할 때까지 대기 */
+       // 자식이 자기가 대기시한다는거임
+ if (cur->parent != NULL) {
+        sema_down(&cur->wait_sema);
     }
 
-    // 항상 thread_exit()을 호출하여 종료
-    thread_exit();
+     // 항상 thread_exit()을 호출하여 종료
+     
+
+  
+    }
+
+      // 잘못된 메모리 접근으로 인한 종료라면 바로 종료
+    if (!cur->wrong_exit&&!cur->exited) {
+        thread_exit(); // 스레드 종료
+    }
+
+    // 정상 종료 시 항상 thread_exit()을 호출
+  // thread_exit();
+           
+  
 
 
-   // printf("%s: exit(%d)\n", thread_name(), status);
+  //  printf("%s: exit(%d)\n", thread_name(), status);
    // thread_exit();
 }
 
@@ -126,6 +153,12 @@ int write(int fd, const void *buffer, unsigned length) {
 }
 
 int wait(tid_t tid) {
+
+ struct thread *child = get_child_thread_by_tid(thread_current(), tid);
+    if (child == NULL || child->parent != thread_current()) {
+        return -1;  // 자식 프로세스가 없거나 이미 대기된 경우
+    }
+
     return process_wait(tid);
 }
 

@@ -154,12 +154,23 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  
+
  // 잘못된 메모리 접근 시 종료, 중복 종료 방지
     if (!is_user_vaddr(fault_addr) || pagedir_get_page(thread_current()->pagedir, fault_addr) == NULL) {
+        
+            
             thread_current()->exited = true;
+
             printf("%s: exit(-1)\n", thread_current()->name);
+           thread_current()->wrong_exit = true;
+
+
             exit(-1);
-        }
+            
+
+        
+    }
     
 
 

@@ -101,10 +101,12 @@ struct thread
     int exit_status;                /* 종료 상태 */
     struct semaphore load_sema;     /* 로드 동기화를 위한 세마포어 */
     struct semaphore exit_sema;     /* 종료 동기화를 위한 세마포어 */
+   struct semaphore wait_sema;     /* 부모가 자식을 처리하는 동안 기다리는 세마포어 */
     struct thread *parent;          /* 부모 스레드 */
     struct list_elem child_elem;    /* 자식 리스트의 요소 */
     struct list child_list;         /* Child thread list */
     bool exited;  // 종료 상태를 저장하는 변수 추가
+    bool wrong_exit;  // 잘못된 종료 상태를 저장하는 변수 추가
 
 #endif
 
