@@ -3,7 +3,13 @@
 #include <stdio.h>
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
-#include "threads/thread.h"
+
+
+#include "threads/vaddr.h"  // is_user_vaddr() 함수 정의를 포함
+#include "userprog/syscall.h"  // exit() 함수가 syscall.c에 정의되어 있음
+#include "threads/thread.h"    // thread_current()를 사용하기 위해 필요
+#include "userprog/pagedir.h"  // pagedir_get_page() 함수 선언 포함
+
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -147,6 +153,15 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+
+ // 잘못된 메모리 접근 시 종료, 중복 종료 방지
+    if (!is_user_vaddr(fault_addr) || pagedir_get_page(thread_current()->pagedir, fault_addr) == NULL) {
+            thread_current()->exited = true;
+            printf("%s: exit(-1)\n", thread_current()->name);
+            exit(-1);
+        }
+    
+
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to

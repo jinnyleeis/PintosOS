@@ -104,6 +104,8 @@ struct thread
     struct thread *parent;          /* 부모 스레드 */
     struct list_elem child_elem;    /* 자식 리스트의 요소 */
     struct list child_list;         /* Child thread list */
+    bool exited;  // 종료 상태를 저장하는 변수 추가
+
 #endif
 
     /* Owned by thread.c. */

@@ -212,6 +212,9 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+    /* 스레드 생성 시 종료되지 않은 상태로 초기화 */
+  t->exited = false;
+
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -497,7 +500,7 @@ init_thread (struct thread *t, const char *name, int priority)
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
 
-
+#ifdef USERPROG
 // 자식 스레드 생성시, 부모-자식간 동기화 위한 세마포어 초기화 
   sema_init(&t->load_sema, 0);
   sema_init(&t->exit_sema, 0);
@@ -514,6 +517,8 @@ init_thread (struct thread *t, const char *name, int priority)
     /* initial_thread의 경우 부모가 없으므로 NULL로 설정 */
     t->parent = NULL;
   }
+
+#endif
 
 }
 

@@ -25,11 +25,16 @@ static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 /* construct_esp 함수의 선언을 load 함수 위에 추가 */
 void construct_esp(char *file_name, void **esp);
+bool is_valid_stack_pointer(void *esp);
+
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
+
+
+
 tid_t
 process_execute (const char *file_name) 
 {
@@ -362,6 +367,23 @@ load (const char *file_name, void (**eip) (void), void **esp)
   return success;
 }
 
+
+
+// 유효한 스택 주소인지 확인하는 함수
+bool is_valid_stack_pointer(void *esp) {
+    // 스택 포인터가 사용자 주소 범위 내에 있는지 확인
+    if (!is_user_vaddr(esp)) {
+        return false;
+    }
+    // 페이지 디렉토리에서 유효한 페이지로 매핑되어 있는지 확인
+    if (pagedir_get_page(thread_current()->pagedir, esp) == NULL) {
+        return false;
+    }
+    return true;
+}
+
+
+
 /* construct_esp: 스택에 argc, argv 저장 */
 void construct_esp(char *file_name, void **esp) {
   char *argv[128];  // 필요한 경우 크기를 조정
@@ -383,6 +405,12 @@ void construct_esp(char *file_name, void **esp) {
     int len = strlen(argv[i]) + 1;
     *esp -= len;
     total_len += len;
+
+       if (!is_valid_stack_pointer(*esp)) {
+         thread_exit();  // 스택 포인터가 유효하지 않으면 종료
+        }
+
+
     memcpy(*esp, argv[i], len);
     argv[i] = *esp;  // Store the address of the argument in argv
   }
@@ -390,30 +418,59 @@ void construct_esp(char *file_name, void **esp) {
   /* Word align the stack */
   int word_align = total_len % 4;
   if (word_align != 0) {
+
     *esp -= (4 - word_align);
+
+     if (!is_valid_stack_pointer(*esp)) {
+    thread_exit();  // 스택 포인터가 유효하지 않으면 종료
+        }
+
     memset(*esp, 0, 4 - word_align);
   }
 
   /* Push NULL sentinel */
   *esp -= sizeof(char *);
+
+ if (!is_valid_stack_pointer(*esp)) {
+    thread_exit();  // 스택 포인터가 유효하지 않으면 종료
+    }
+
   *(uint32_t *)(*esp) = 0;
 
   /* Push the addresses of argv[argc-1] ~ argv[0] */
   for (int i = argc - 1; i >= 0; i--) {
     *esp -= sizeof(char *);
+
+     if (!is_valid_stack_pointer(*esp)) {
+    thread_exit();  // 스택 포인터가 유효하지 않으면 종료
+        }
+
     *(uint32_t *)(*esp) = (uint32_t)argv[i];
   }
 
   /* Push the address of argv */
   *esp -= sizeof(char **);
+
+   if (!is_valid_stack_pointer(*esp)) {
+    thread_exit();  // 스택 포인터가 유효하지 않으면 종료
+    }
   *(uint32_t *)(*esp) = (uint32_t)(*esp + 4);
 
   /* Push argc */
   *esp -= sizeof(int);
+
+   if (!is_valid_stack_pointer(*esp)) {
+    thread_exit();  // 스택 포인터가 유효하지 않으면 종료
+    }
+
   *(int *)(*esp) = argc;
 
   /* Push a fake return address */
   *esp -= sizeof(void *);
+  if (!is_valid_stack_pointer(*esp)) {
+    thread_exit();  // 스택 포인터가 유효하지 않으면 종료
+    }
+
   *(uint32_t *)(*esp) = 0;
 
   /* Dump the stack for debugging */
