@@ -26,12 +26,25 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 /* construct_esp 함수의 선언을 load 함수 위에 추가 */
 void construct_esp(char *file_name, void **esp);
 bool is_valid_stack_pointer(void *esp);
+struct thread *get_child_thread_by_tid(struct thread *parent, tid_t child_tid);
 
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
+
+struct thread *get_child_thread_by_tid(struct thread *parent, tid_t child_tid) {
+  struct list_elem *e;
+
+  for (e = list_begin(&parent->child_list); e != list_end(&parent->child_list); e = list_next(e)) {
+    struct thread *t = list_entry(e, struct thread, child_elem);
+    if (t->tid == child_tid) {
+      return t;
+    }
+  }
+  return NULL;  // 자식 스레드를 찾을 수 없음
+}
 
 
 
@@ -113,18 +126,27 @@ process_wait (tid_t child_tid UNUSED)
 {
 
 
-for (long long i = 0; i < 3000000000LL; i++){// 임시방편으로 바로 자식 프로세스 안죽도록
-};
+//for (long long i = 0; i < 3000000000LL; i++){// 임시방편으로 바로 자식 프로세스 안죽도록
+//};
 
-  return -1;
+ // return -1;
 /**/
-/**
+
     struct thread *cur = thread_current();
     struct thread *child = get_thread_by_tid(child_tid);
 
     if (child == NULL || child->parent != cur)
         return -1;
 
+/* 자식 프로세스가 종료될 때까지 대기 */
+  if (!child->exited) {
+    sema_down(&child->exit_sema);
+  }
+
+    /* 자식의 종료 상태 반환 */
+  int exit_status = child->exit_status;
+  list_remove(&child->child_elem);
+  return exit_status;
     /* 자식 프로세스가 종료될 때까지 대기 */
    // sema_down(&child->exit_sema);
 
