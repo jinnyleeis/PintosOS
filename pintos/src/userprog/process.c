@@ -107,12 +107,13 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
 
-/*
+
 for (long long i = 0; i < 3000000000LL; i++){// 임시방편으로 바로 자식 프로세스 안죽도록
 };
 
-  return -1;*/
+  return -1;
 /**/
+/**
     struct thread *cur = thread_current();
     struct thread *child = get_thread_by_tid(child_tid);
 
@@ -120,14 +121,15 @@ for (long long i = 0; i < 3000000000LL; i++){// 임시방편으로 바로 자식
         return -1;
 
     /* 자식 프로세스가 종료될 때까지 대기 */
-    sema_down(&child->exit_sema);
+   // sema_down(&child->exit_sema);
 
-    int exit_status = child->exit_status;
+    //int exit_status = child->exit_status;
 
     /* 자식 프로세스가 종료되었으므로 정리 */
-    list_remove(&child->child_elem);
+    //list_remove(&child->child_elem);
 
-    return exit_status;
+    //return exit_status;
+    
 
 }
 
