@@ -94,7 +94,7 @@ void halt(void) {
     shutdown_power_off(); // 시스템 종료
 }
 
-void exit(int status) {
+void exit(int status){
 
  struct thread *cur = thread_current();
 
@@ -132,14 +132,7 @@ if(!cur->wrong_exit){
         thread_exit(); // 스레드 종료
     }
 
-    // 정상 종료 시 항상 thread_exit()을 호출
-  // thread_exit();
-           
-  
 
-
-  //  printf("%s: exit(%d)\n", thread_name(), status);
-   // thread_exit();
 }
 
 int write(int fd, const void *buffer, unsigned length) {
