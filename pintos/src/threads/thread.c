@@ -494,6 +494,18 @@ init_thread (struct thread *t, const char *name, int priority)
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
+
+
+// 자식 스레드 생성시, 부모-자식간 동기화 위한 세마포어 초기화 
+  sema_init(&t->load_sema, 0);
+  sema_init(&t->exit_sema, 0);
+// 현재 스레드를 자식 스레드의 부모로 설정 
+  t->parent = thread_current();
+  // 자식 스레드 리스트 초기화 
+  list_init(&t->child_list);
+  // thread_create()로 생성한 스레드는 부모 스레드의 자식 리스트에 추가
+  list_push_back(&t->parent->child_list, &t->child_elem);
+
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
