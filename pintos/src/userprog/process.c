@@ -23,8 +23,8 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-/* construct_esp 함수의 선언을 load 함수 위에 추가 */
-void construct_esp(char *file_name, void **esp);
+/* setup_user_stack 함수의 선언을 load 함수 위에 추가 */
+void setup_user_stack(char *file_name, void **esp);
 bool is_valid_stack_pointer(void *esp);
 struct thread *get_child_thread_by_tid(struct thread *parent, tid_t child_tid);
 
@@ -315,11 +315,16 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Open executable file. */
   // file_name 복사본을 만들기 위해 메모리 할당
   char *full_file_name_copy = malloc(strlen(file_name) + 1); 
+
+  char full_file_name_copy_2[256];
+
+
   if (full_file_name_copy == NULL)goto done;  // 메모리 할당 실패 시 종료
 
   strlcpy(full_file_name_copy, file_name, strlen(file_name) + 1);  // 안전하게 복사
+  strlcpy(full_file_name_copy_2, file_name, strlen(file_name) + 1);  // 안전하게 복사
 
- // printf("full_file_name_copy: %s\n", full_file_name_copy);
+
   
   /* 파일 이름과 인자를 분리 */
   char *current_token = NULL;
@@ -331,12 +336,18 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (current_token == NULL)
     goto done;  // 토큰이 없으면 종료
 
+
   // 프로그램 이름을 사용하여 실행 파일 열기
   char *real_file_name_copy = malloc(strlen(current_token) + 1);
   if (real_file_name_copy == NULL)
     goto done;
   strlcpy(real_file_name_copy, current_token, strlen(current_token) + 1);
   file = filesys_open(real_file_name_copy);
+
+  //  printf("full_file_name_copy: %s\n", full_file_name_copy);
+   //     printf("full_file_name_copy2: %s\n", full_file_name_copy_2);
+
+
 
   if (file == NULL) {
     printf("load: %s: open failed\n", real_file_name_copy);
@@ -387,8 +398,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (!setup_stack(esp))
     goto done;
 
-  /* construct_esp 호출하여 인자 처리 */
-  construct_esp((char *)file_name, esp);
+  /* setup_user_stack 호출하여 인자 처리 */
+  setup_user_stack(full_file_name_copy_2, esp);
 
 
 
@@ -424,18 +435,15 @@ bool is_valid_stack_pointer(void *esp) {
 
 
 
-/* construct_esp: 스택에 argc, argv 저장 */
-void construct_esp(char *file_name, void **esp) {
+/* setup_user_stack: 스택에 argc, argv 저장 */
+void setup_user_stack(char *file_name, void **esp) {
   char *argv[128];  // 필요한 경우 크기를 조정
   int argc = 0;
   char *token, *last;
   int total_len = 0;
   
-  /* Tokenize file_name to count arguments (argc) and store them in argv */
-  char stored_file_name[256];
-  strlcpy(stored_file_name, file_name, strlen(file_name) + 1);
-
-  for (token = strtok_r(stored_file_name, " ", &last); token != NULL; token = strtok_r(NULL, " ", &last)) {
+  // 우선, arv[argc]에 각 인자를 저장함
+  for (token = strtok_r(file_name, " ", &last); token != NULL; token = strtok_r(NULL, " ", &last)) {
     argv[argc] = token;
     argc++;
   }
@@ -455,17 +463,18 @@ void construct_esp(char *file_name, void **esp) {
     argv[i] = *esp;  // Store the address of the argument in argv
   }
 
-  /* Word align the stack */
-  int word_align = total_len % 4;
-  if (word_align != 0) {
+  /*padding the stack */
+  int remainder = total_len % 4;
+   int padding_size = (4 - remainder);
+  if (remainder != 0) {
 
-    *esp -= (4 - word_align);
+    *esp -= (padding_size);
 
      if (!is_valid_stack_pointer(*esp)) {
     thread_exit();  // 스택 포인터가 유효하지 않으면 종료
         }
 
-    memset(*esp, 0, 4 - word_align);
+    memset(*esp, 0, padding_size);
   }
 
   /* Push NULL sentinel */

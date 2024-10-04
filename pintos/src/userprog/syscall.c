@@ -162,21 +162,31 @@ int wait(tid_t tid) {
     return process_wait(tid);
 }
 
+
+
 int read(int fd, void *buffer, unsigned size) {
     check_valid_buffer(buffer, size); // 버퍼 유효성 검사 추가
 
-    unsigned int i = 0;
-    if (fd == 0) {
+    unsigned int i;
+    if (fd == 0) {  // 파일 디스크립터가 콘솔 입력인 경우
         for (i = 0; i < size; i++) {
-            char c = input_getc();  // 콘솔로부터 문자 입력
-            if (c == '\0' || !buffer) {
+            if (buffer == NULL) {  // 버퍼가 NULL일 경우 종료하도록 
                 break;
             }
-            ((char *)buffer)[i] = c;
+            char c = input_getc();  // 콘솔에서 문자 입력
+            if (c == '\0') {  // NULL 입력 시에도 종료
+                break;
+            }
+            ((char *)buffer)[i] = c;  // 입력된 문자를 -> 버퍼 저장 
         }
+    } else {
+        return -1;  // fd 아직은 파일 디스크립터가 아닌 콘솔 입력만 지원
     }
-    return i;
+    return i;  // 실제로 읽은 문자의 수 반환
 }
+
+
+
 
 tid_t exec(const char *file) {
   tid_t pid = process_execute(file);  // 새로운 프로세스 생성 및 실행
