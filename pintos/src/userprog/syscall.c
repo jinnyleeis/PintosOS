@@ -91,6 +91,38 @@ static void syscall_handler(struct intr_frame *f UNUSED) {
             f->eax = max_of_four_int(*(int *)(f->esp + 4), *(int *)(f->esp + 8),
                                     *(int *)(f->esp + 12), *(int *)(f->esp + 16));
             break;
+            
+        case SYS_CREATE:
+            check_valid_vaddr(f->esp + 4);
+            check_valid_vaddr(f->esp + 8);
+            f->eax = create((const char *)*(uint32_t *)(f->esp + 4), *(unsigned *)(f->esp + 8));
+            break;
+        case SYS_REMOVE:
+            check_valid_vaddr(f->esp + 4);
+            f->eax = remove((const char *)*(uint32_t *)(f->esp + 4));
+            break;
+        case SYS_OPEN:
+            check_valid_vaddr(f->esp + 4);
+            f->eax = open((const char *)*(uint32_t *)(f->esp + 4));
+            break;
+        case SYS_CLOSE:
+            check_valid_vaddr(f->esp + 4);
+            close(*(int *)(f->esp + 4));
+             break;
+        case SYS_FILESIZE:
+            check_valid_vaddr(f->esp + 4);
+            f->eax = filesize(*(int *)(f->esp + 4));
+            break;
+        case SYS_SEEK:
+            check_valid_vaddr(f->esp + 4);
+            check_valid_vaddr(f->esp + 8);
+            seek(*(int *)(f->esp + 4), *(unsigned *)(f->esp + 8));
+            break;
+        case SYS_TELL:
+            check_valid_vaddr(f->esp + 4);
+            f->eax = tell(*(int *)(f->esp + 4));
+            break; 
+            
         default:
             exit(-1); // 잘못된 시스템 콜 번호의 경우 프로세스 종료
             break;
