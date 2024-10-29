@@ -1,5 +1,8 @@
 #include "userprog/syscall.h"
-#include <stdio.h>
+#include "lib/stdio.h"
+#include "lib/kernel/stdio.h"
+
+//#include "devices/console.h"  // printf 함수 사용을 위해 추가
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -9,6 +12,12 @@
 #include "devices/input.h"
 #include "threads/synch.h" // sema_down, sema_up 포함
 #include "userprog/pagedir.h"  // pagedir_get_page 함수 선언
+
+#include "filesys/filesys.h"
+#include "filesys/file.h"
+
+
+static struct lock filesys_lock; /* 파일 시스템 동기화를 위한 전역 락 */
 
 
 static void syscall_handler(struct intr_frame *);
@@ -20,6 +29,17 @@ int wait(tid_t);
 tid_t exec(const char *file);
 void check_valid_vaddr(const void *vaddr);
 void check_valid_buffer(const void *buffer, unsigned size);
+void check_valid_string(const char *str);
+
+
+bool create (const char *file, unsigned initial_size);
+bool remove (const char *file);
+int open (const char *file);
+int filesize (int fd);
+
+void seek (int fd, unsigned position);
+unsigned tell (int fd);
+void close (int fd);
 
 // 사용자 주소 유효성 검사 함수
 void check_valid_vaddr(const void *vaddr) {
@@ -40,8 +60,22 @@ void check_valid_buffer(const void *buffer, unsigned size) {
     }
 }
 
+/* 문자열의 유효성 검사 함수 */
+void check_valid_string(const char *str)
+{
+  check_valid_vaddr((const void *)str);
+  while (*str != '\0')
+  {
+    check_valid_vaddr((const void *)str);
+    str++;
+  }
+}
+
+
+
 void syscall_init(void) {
     intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
+    lock_init(&filesys_lock); /* 전역 락 초기화 */
 }
 
 static void syscall_handler(struct intr_frame *f UNUSED) {
@@ -177,11 +211,22 @@ if(!cur->wrong_exit){
 int write(int fd, const void *buffer, unsigned length) {
     check_valid_buffer(buffer, length); // 버퍼 유효성 검사 추가
 
+     struct thread *cur = thread_current();
+    int bytes_written = 0;
+
+
     if (fd == 1) {
         putbuf(buffer, length);
         return length;
+    }else if (fd >= 2 && fd < cur->next_fd && cur->fdt[fd] != NULL) {
+        /* 파일에 쓰기 */
+        lock_acquire(&filesys_lock);
+        bytes_written = file_write(cur->fdt[fd], buffer, length);
+        lock_release(&filesys_lock);
+    } else {
+        bytes_written = -1; /* 잘못된 fd */
     }
-    return -1;
+    return bytes_written;
 }
 
 int wait(tid_t tid) {
@@ -199,6 +244,9 @@ int wait(tid_t tid) {
 int read(int fd, void *buffer, unsigned size) {
     check_valid_buffer(buffer, size); // 버퍼 유효성 검사 추가
 
+    struct thread *cur = thread_current();
+    int bytes_read = 0;
+
     unsigned int i;
     if (fd == 0) {  // 파일 디스크립터가 콘솔 입력인 경우
         for (i = 0; i < size; i++) {
@@ -211,17 +259,31 @@ int read(int fd, void *buffer, unsigned size) {
             }
             ((char *)buffer)[i] = c;  // 입력된 문자를 -> 버퍼 저장 
         }
+
+        return i;  // 실제로 읽은 문자의 수 반환
+    } else if (fd >= 2 && fd < cur->next_fd && cur->fdt[fd] != NULL) {
+        /* 파일에서 읽기 */
+        lock_acquire(&filesys_lock);
+        bytes_read = file_read(cur->fdt[fd], buffer, size);
+        lock_release(&filesys_lock);
+        
     } else {
-        return -1;  // fd 아직은 파일 디스크립터가 아닌 콘솔 입력만 지원
+        bytes_read = -1; /* 잘못된 fd */
+       
     }
-    return i;  // 실제로 읽은 문자의 수 반환
+     return bytes_read;
+    
 }
 
 
 
 
 tid_t exec(const char *file) {
+
+check_valid_string(file);  // 유효한 문자열인지 확인
+
   tid_t pid = process_execute(file);  // 새로운 프로세스 생성 및 실행
+
 
     struct thread *child = get_child_thread_by_tid(thread_current(), pid);
 
@@ -270,3 +332,106 @@ int max_of_four_int(int a, int b, int c, int d) {
   if (d > max) max = d;
   return max;
 }
+
+
+
+// 프로젝트2 
+
+/* create 시스템 콜 */
+bool create(const char *file, unsigned initial_size)
+{
+  check_valid_string(file);
+  lock_acquire(&filesys_lock);
+  bool success = filesys_create(file, initial_size);
+  lock_release(&filesys_lock);
+  return success;
+}
+
+/* remove 시스템 콜 */
+bool remove(const char *file)
+{
+  check_valid_string(file);
+  lock_acquire(&filesys_lock);
+  bool success = filesys_remove(file);
+  lock_release(&filesys_lock);
+  return success;
+}
+
+/* open 시스템 콜 */
+int open(const char *file)
+{
+  check_valid_string(file);
+  lock_acquire(&filesys_lock);
+  struct file *opened_file = filesys_open(file);
+  if (opened_file == NULL)
+  {
+    lock_release(&filesys_lock);
+    return -1;
+  }
+
+  struct thread *cur = thread_current();
+  int fd = cur->next_fd;
+  /* 파일 디스크립터 테이블에 파일 포인터 저장 */
+  cur->fdt[fd] = opened_file;
+  cur->next_fd++;
+  lock_release(&filesys_lock);
+  return fd;
+}
+
+/* close 시스템 콜 */
+void close(int fd)
+{
+  struct thread *cur = thread_current();
+  if (fd < 2 || fd >= cur->next_fd || cur->fdt[fd] == NULL)
+  {
+    exit(-1);
+  }
+  lock_acquire(&filesys_lock);
+  file_close(cur->fdt[fd]);
+  cur->fdt[fd] = NULL;
+  lock_release(&filesys_lock);
+}
+
+/* filesize 시스템 콜 */
+int filesize(int fd)
+{
+  struct thread *cur = thread_current();
+  if (fd < 2 || fd >= cur->next_fd || cur->fdt[fd] == NULL)
+  {
+    exit(-1);
+  }
+  lock_acquire(&filesys_lock);
+  int size = file_length(cur->fdt[fd]);
+  lock_release(&filesys_lock);
+  return size;
+}
+
+
+/* seek 시스템 콜 */
+void seek(int fd, unsigned position)
+{
+  struct thread *cur = thread_current();
+  if (fd < 2 || fd >= cur->next_fd || cur->fdt[fd] == NULL)
+  {
+    exit(-1);
+  }
+  lock_acquire(&filesys_lock);
+  file_seek(cur->fdt[fd], position);
+  lock_release(&filesys_lock);
+}
+
+/* tell 시스템 콜 */
+unsigned tell(int fd)
+{
+  struct thread *cur = thread_current();
+  if (fd < 2 || fd >= cur->next_fd || cur->fdt[fd] == NULL)
+  {
+    exit(-1);
+  }
+  lock_acquire(&filesys_lock);
+  unsigned position = file_tell(cur->fdt[fd]);
+  lock_release(&filesys_lock);
+  return position;
+}
+
+

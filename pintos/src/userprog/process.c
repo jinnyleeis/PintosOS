@@ -184,6 +184,14 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+    /* 실행 파일에 대한 쓰기 허용 및 닫기 */
+  if (cur->exec_file != NULL)
+  {
+    file_allow_write(cur->exec_file);
+    file_close(cur->exec_file);
+  }
+
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -342,6 +350,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (real_file_name_copy == NULL)
     goto done;
   strlcpy(real_file_name_copy, current_token, strlen(current_token) + 1);
+
+
   file = filesys_open(real_file_name_copy);
 
   //  printf("full_file_name_copy: %s\n", full_file_name_copy);
@@ -353,6 +363,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
     printf("load: %s: open failed\n", real_file_name_copy);
     goto done;
   }
+
+    /* 실행 파일에 대한 쓰기 방지 */
+  file_deny_write(file);
+  thread_current()->exec_file = file;  // 이후에 사용할 수 있도록 파일 저장
 
   /* ELF 실행 파일 헤더를 읽고 검증 */
   if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -409,11 +423,18 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   success = true;
 
+
+
  done:
-  /* Clean up */
-  file_close(file);
+  if (!success && file != NULL) {
+    file_close(file);
+  }
+
+
  // if (full_file_name_copy != NULL) 
  //   free(full_file_name_copy);
+  /* 로드가 성공했다면, 파일은 열려 있는 상태임
+  // 이는  thread_current()->exec_file에서 관리할것이므로 괜찮음 */
 
   return success;
 }
