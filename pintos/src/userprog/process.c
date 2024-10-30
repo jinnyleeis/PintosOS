@@ -185,12 +185,18 @@ process_exit (void)
   uint32_t *pd;
 
     /* 실행 파일에 대한 쓰기 허용 및 닫기 */
-  if (cur->exec_file != NULL)
-  {
-    file_allow_write(cur->exec_file);
-    file_close(cur->exec_file);
-  }
+    if (cur->exec_file != NULL) {
+        file_close(cur->exec_file);
+        cur->exec_file = NULL;
+    }
 
+    /* 모든 열린 파일 닫기 */
+    for (int fd = 2; fd < cur->next_fd; fd++) {
+        if (cur->fdt[fd] != NULL) {
+            file_close(cur->fdt[fd]);
+            cur->fdt[fd] = NULL;
+        }
+    }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -426,9 +432,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 
  done:
-  if (!success && file != NULL) {
-    file_close(file);
-  }
+ // if (!success && file != NULL) {
+ //   file_close(file);
+ // }
 
 
  // if (full_file_name_copy != NULL) 

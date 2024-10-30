@@ -108,6 +108,11 @@ struct thread
     bool exited;  // 종료 상태를 저장하는 변수 추가
     bool wrong_exit;  // 잘못된 종료 상태를 저장하는 변수 추가
 
+     /* 파일 디스크립터 테이블 추가 */
+    struct file *fdt[128]; /* 파일 디스크립터 테이블 */
+    int next_fd;           /* 다음에 할당할 파일 디스크립터 번호 */
+    struct file *exec_file; /* 실행 파일에 대한 파일 포인터 */
+
 #endif
 
     /* Owned by thread.c. */

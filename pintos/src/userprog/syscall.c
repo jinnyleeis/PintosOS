@@ -98,7 +98,7 @@ static void syscall_handler(struct intr_frame *f UNUSED) {
             check_valid_vaddr(f->esp + 4); // fd
             check_valid_vaddr(f->esp + 8); // buffer
             check_valid_vaddr(f->esp + 12); // size
-            write((int)*(uint32_t *)(f->esp + 4), (void *)*(uint32_t *)(f->esp + 8), (unsigned)*(uint32_t *)(f->esp + 12));
+            f->eax = write((int)*(uint32_t *)(f->esp + 4), (void *)*(uint32_t *)(f->esp + 8), (unsigned)*(uint32_t *)(f->esp + 12));
             break;   
         case SYS_EXIT:
             check_valid_vaddr(f->esp + 4); // status
@@ -209,25 +209,38 @@ if(!cur->wrong_exit){
 }
 
 int write(int fd, const void *buffer, unsigned length) {
-    check_valid_buffer(buffer, length); // 버퍼 유효성 검사 추가
+    check_valid_buffer(buffer, length);
 
-     struct thread *cur = thread_current();
+    struct thread *cur = thread_current();
     int bytes_written = 0;
+
+       printf("write() called with fd=%d, length=%u\n", fd, length);
 
 
     if (fd == 1) {
         putbuf(buffer, length);
+      printf("write(): fd=1, wrote to console, length=%u\n", length);
+
         return length;
-    }else if (fd >= 2 && fd < cur->next_fd && cur->fdt[fd] != NULL) {
-        /* 파일에 쓰기 */
+    } else if (fd >= 2 && fd < cur->next_fd && cur->fdt[fd] != NULL) {
         lock_acquire(&filesys_lock);
         bytes_written = file_write(cur->fdt[fd], buffer, length);
         lock_release(&filesys_lock);
+
+       printf("write(): file_write() returned %d\n", bytes_written);
+
+
+
     } else {
-        bytes_written = -1; /* 잘못된 fd */
+
+              printf("write(): invalid fd=%d\n", fd);
+
+        bytes_written = -1;
+
     }
     return bytes_written;
 }
+
 
 int wait(tid_t tid) {
 
@@ -247,20 +260,25 @@ int read(int fd, void *buffer, unsigned size) {
     struct thread *cur = thread_current();
     int bytes_read = 0;
 
-    unsigned int i;
+    
+
     if (fd == 0) {  // 파일 디스크립터가 콘솔 입력인 경우
+        unsigned int i;
         for (i = 0; i < size; i++) {
-            if (buffer == NULL) {  // 버퍼가 NULL일 경우 종료하도록 
+              if (buffer == NULL) {  // 버퍼가 NULL일 경우 종료하도록 
                 break;
             }
+        
             char c = input_getc();  // 콘솔에서 문자 입력
             if (c == '\0') {  // NULL 입력 시에도 종료
                 break;
             }
             ((char *)buffer)[i] = c;  // 입력된 문자를 -> 버퍼 저장 
+             bytes_read++;
+
         }
 
-        return i;  // 실제로 읽은 문자의 수 반환
+       return bytes_read;  // 실제로 읽은 문자의 수 반환
     } else if (fd >= 2 && fd < cur->next_fd && cur->fdt[fd] != NULL) {
         /* 파일에서 읽기 */
         lock_acquire(&filesys_lock);
@@ -342,6 +360,10 @@ bool create(const char *file, unsigned initial_size)
 {
   check_valid_string(file);
   lock_acquire(&filesys_lock);
+
+      printf("create(): file=%s, initial_size=%u\n", file, initial_size);
+
+
   bool success = filesys_create(file, initial_size);
   lock_release(&filesys_lock);
   return success;
@@ -358,6 +380,33 @@ bool remove(const char *file)
 }
 
 /* open 시스템 콜 */
+/*int open(const char *file)
+{
+  check_valid_string(file);
+  lock_acquire(&filesys_lock);
+  struct file *opened_file = filesys_open(file);
+  if (opened_file == NULL)
+  {
+    lock_release(&filesys_lock);
+    return -1;
+  }
+ struct thread *cur = thread_current();
+  
+  // 파일 이름 비교하여 실행 파일인지 확인
+  if (strcmp(file, cur->name) == 0)
+  {
+    // 실행 파일인 경우 쓰기 거부
+    file_deny_write(opened_file);
+  }
+
+  int fd = cur->next_fd;
+  cur->fdt[fd] = opened_file;
+  cur->next_fd++;
+  lock_release(&filesys_lock);
+  return fd;
+}
+*/
+
 int open(const char *file)
 {
   check_valid_string(file);
@@ -368,10 +417,9 @@ int open(const char *file)
     lock_release(&filesys_lock);
     return -1;
   }
-
   struct thread *cur = thread_current();
+
   int fd = cur->next_fd;
-  /* 파일 디스크립터 테이블에 파일 포인터 저장 */
   cur->fdt[fd] = opened_file;
   cur->next_fd++;
   lock_release(&filesys_lock);
@@ -379,6 +427,7 @@ int open(const char *file)
 }
 
 /* close 시스템 콜 */
+/*
 void close(int fd)
 {
   struct thread *cur = thread_current();
@@ -387,6 +436,29 @@ void close(int fd)
     exit(-1);
   }
   lock_acquire(&filesys_lock);
+
+   // 실행 파일인지 확인
+  if (cur->fdt[fd] == cur->exec_file)
+  {
+   // file_allow_write(cur->fdt[fd]);
+    cur->exec_file = NULL;
+  }
+
+
+  file_close(cur->fdt[fd]);
+  cur->fdt[fd] = NULL;
+  lock_release(&filesys_lock);
+}
+*/
+void close(int fd)
+{
+  struct thread *cur = thread_current();
+  if (fd < 2 || fd >= cur->next_fd || cur->fdt[fd] == NULL)
+  {
+    exit(-1);
+  }
+  lock_acquire(&filesys_lock);
+
   file_close(cur->fdt[fd]);
   cur->fdt[fd] = NULL;
   lock_release(&filesys_lock);

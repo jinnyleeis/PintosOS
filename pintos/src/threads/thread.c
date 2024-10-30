@@ -209,12 +209,16 @@ thread_create (const char *name, int priority,
     return TID_ERROR;
 
   /* Initialize thread. */
+ 
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+ #ifdef USERPROG
     /* 스레드 생성 시 종료되지 않은 상태로 초기화 */
   t->exited = false;
    t->wrong_exit = false;
+  #endif
+
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -520,6 +524,12 @@ init_thread (struct thread *t, const char *name, int priority)
     /* initial_thread의 경우 부모가 없으므로 NULL로 설정 */
     t->parent = NULL;
   }
+
+    /* 파일 디스크립터 테이블 초기화 */
+  t->next_fd = 2; /* fd 0과 1은 표준 입출력으로 예약 */
+  memset(t->fdt, 0, sizeof(t->fdt));
+
+  t->exec_file = NULL;  // 실행 파일에 대한 파일 포인터 초기화
 
 #endif
 
