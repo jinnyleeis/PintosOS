@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
-
+#include <string.h>  
 
 #include "threads/vaddr.h"  // is_user_vaddr() 함수 정의를 포함
 #include "userprog/syscall.h"  // exit() 함수가 syscall.c에 정의되어 있음
@@ -162,7 +162,12 @@ page_fault (struct intr_frame *f)
             
             thread_current()->exited = true;
 
-            printf("%s: exit(-1)\n", thread_current()->name);
+
+         // suppress_exit_msg 플래그 확인
+    if (!thread_current()->suppress_exit_msg) {
+        printf("%s: exit(-1)\n", thread_current()->name);
+    }
+
            thread_current()->wrong_exit = true;
 
 

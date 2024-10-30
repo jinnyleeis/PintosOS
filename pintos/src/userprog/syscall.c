@@ -16,6 +16,9 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 
+//디버깅용
+#include "devices/timer.h"
+
 
 static struct lock filesys_lock; /* 파일 시스템 동기화를 위한 전역 락 */
 
@@ -180,7 +183,7 @@ void exit(int status){
         cur->exited = true;
         cur->exit_status = status;
 
-if(!cur->wrong_exit){
+if(!cur->wrong_exit && !cur->suppress_exit_msg){
         printf("%s: exit(%d)\n", thread_name(), status);
         }
 
@@ -214,12 +217,12 @@ int write(int fd, const void *buffer, unsigned length) {
     struct thread *cur = thread_current();
     int bytes_written = 0;
 
-       printf("write() called with fd=%d, length=%u\n", fd, length);
+     //  printf("write() called with fd=%d, length=%u\n", fd, length);
 
 
     if (fd == 1) {
         putbuf(buffer, length);
-      printf("write(): fd=1, wrote to console, length=%u\n", length);
+    //  printf("write(): fd=1, wrote to console, length=%u\n", length);
 
         return length;
     } else if (fd >= 2 && fd < cur->next_fd && cur->fdt[fd] != NULL) {
@@ -227,13 +230,13 @@ int write(int fd, const void *buffer, unsigned length) {
         bytes_written = file_write(cur->fdt[fd], buffer, length);
         lock_release(&filesys_lock);
 
-       printf("write(): file_write() returned %d\n", bytes_written);
+     //  printf("write(): file_write() returned %d\n", bytes_written);
 
 
 
     } else {
 
-              printf("write(): invalid fd=%d\n", fd);
+            //  printf("write(): invalid fd=%d\n", fd);
 
         bytes_written = -1;
 
@@ -248,6 +251,9 @@ int wait(tid_t tid) {
     if (child == NULL || child->parent != thread_current()) {
         return -1;  // 자식 프로세스가 없거나 이미 대기된 경우
     }
+
+
+     timer_sleep(10);
 
     return process_wait(tid);
 }
@@ -361,7 +367,7 @@ bool create(const char *file, unsigned initial_size)
   check_valid_string(file);
   lock_acquire(&filesys_lock);
 
-      printf("create(): file=%s, initial_size=%u\n", file, initial_size);
+   //   printf("create(): file=%s, initial_size=%u\n", file, initial_size);
 
 
   bool success = filesys_create(file, initial_size);

@@ -74,6 +74,15 @@ strlcpy(first_word, full_name, first_word_length + 1);  // +1은 NULL 문자 포
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (first_word, PRI_DEFAULT, start_process, fn_copy);
+
+
+if (tid != TID_ERROR) {
+    struct thread *child_thread = get_thread_by_tid(tid);
+    if (child_thread != NULL && strncmp(child_thread->name, "multi-oom", strlen("multi-oom")) == 0) {
+        child_thread->suppress_exit_msg = true;  // multi-oom 프로세스에 대해 플래그 설정
+    }
+}
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
 

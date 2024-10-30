@@ -113,6 +113,8 @@ struct thread
     int next_fd;           /* 다음에 할당할 파일 디스크립터 번호 */
     struct file *exec_file; /* 실행 파일에 대한 파일 포인터 */
 
+    bool suppress_exit_msg;  // 종료 메시지 억제를 제어하는 플래그 추가
+
 #endif
 
     /* Owned by thread.c. */
