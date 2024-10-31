@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"   // 세마포어 사용을 위해 추가
+#include "filesys/file.h"  // 추가: struct file의 정의를 포함
 
 
 /* States in a thread's life cycle. */
