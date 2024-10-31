@@ -527,7 +527,9 @@ init_thread (struct thread *t, const char *name, int priority)
 
     /* 파일 디스크립터 테이블 초기화 */
   t->next_fd = 2; /* fd 0과 1은 표준 입출력으로 예약 */
-  memset(t->fdt, 0, sizeof(t->fdt));
+  for (int i = 0; i < 128; i++) {
+    t->fdt[i] = NULL;
+}
     t->suppress_exit_msg = false;  // 플래그 초기화
 
   t->exec_file = NULL;  // 실행 파일에 대한 파일 포인터 초기화

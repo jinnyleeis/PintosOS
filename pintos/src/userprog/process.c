@@ -202,6 +202,10 @@ process_exit (void)
     /* 모든 열린 파일 닫기 */
     for (int fd = 2; fd < cur->next_fd; fd++) {
         if (cur->fdt[fd] != NULL) {
+
+          // 일단 추가해봄
+//           file_allow_write(cur->exec_file);
+
             file_close(cur->fdt[fd]);
             cur->fdt[fd] = NULL;
         }
@@ -243,7 +247,8 @@ process_activate (void)
 
 
 /* We load ELF binaries.  The following definitions are taken
-   from the ELF specification, [ELF1], more-or-less verbatim.  */
+  
+ from the ELF specification, [ELF1], more-or-less verbatim.  */
 
 /* ELF types.  See [ELF1] 1-2. */
 typedef uint32_t Elf32_Word, Elf32_Addr, Elf32_Off;
@@ -380,9 +385,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   }
 
     /* 실행 파일에 대한 쓰기 방지 */
-  file_deny_write(file);
+//  file_deny_write(file);
   thread_current()->exec_file = file;  // 이후에 사용할 수 있도록 파일 저장
-
+ // 실행 파일 포인터만 저장
   /* ELF 실행 파일 헤더를 읽고 검증 */
   if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp(ehdr.e_ident, "\177ELF\1\1\1", 7)

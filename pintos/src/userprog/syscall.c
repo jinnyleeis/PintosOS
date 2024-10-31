@@ -1,6 +1,8 @@
 #include "userprog/syscall.h"
 #include "lib/stdio.h"
 #include "lib/kernel/stdio.h"
+#include "lib/string.h"
+
 
 //#include "devices/console.h"  // printf 함수 사용을 위해 추가
 #include <syscall-nr.h>
@@ -230,17 +232,21 @@ int write(int fd, const void *buffer, unsigned length) {
         bytes_written = file_write(cur->fdt[fd], buffer, length);
         lock_release(&filesys_lock);
 
-     //  printf("write(): file_write() returned %d\n", bytes_written);
+       printf("else if write(): file_write() returned %d\n", bytes_written);
 
 
 
     } else {
 
             //  printf("write(): invalid fd=%d\n", fd);
+                   printf("else : write(): file_write() returned %d\n", bytes_written);
+
 
         bytes_written = -1;
 
     }
+           printf("outside write(): file_write() returned %d\n", bytes_written);
+
     return bytes_written;
 }
 
@@ -417,15 +423,33 @@ int open(const char *file)
 {
   check_valid_string(file);
   lock_acquire(&filesys_lock);
+      printf("open(): 파일 '%s'을(를) 열려고 시도 중\n", file);
+
   struct file *opened_file = filesys_open(file);
   if (opened_file == NULL)
   {
+            printf("open(): filesys_open()이 파일 '%s'에 대해 NULL을 반환함\n", file);
+
     lock_release(&filesys_lock);
     return -1;
   }
   struct thread *cur = thread_current();
 
+  printf("open(): filesys_open()이 파일 '%s'에 대해 성공함\n", file);
+    printf("open(): 파일 '%s'을(를) 스레드 이름 '%s'과(와) 비교 중\n", file, cur->name);
+ // 파일 이름을 비교하여 실행 파일인지 확인
+  if (strcmp(file, cur->name) == 0)
+  {
+            printf("open(): 파일 '%s'에 대한 쓰기 접근을 거부함\n", file);
+
+    // 실행 파일인 경우 쓰기 거부
+    file_deny_write(opened_file);
+  }
+  
+
   int fd = cur->next_fd;
+      printf("open(): 파일 디스크립터 %d 할당됨\n", fd);
+
   cur->fdt[fd] = opened_file;
   cur->next_fd++;
   lock_release(&filesys_lock);
@@ -465,9 +489,21 @@ void close(int fd)
   }
   lock_acquire(&filesys_lock);
 
+
+  // 실행 파일인지 확인
+  
+  if (cur->fdt[fd] == cur->exec_file)
+  {
+    file_allow_write(cur->fdt[fd]);
+    cur->exec_file = NULL;
+  }
+
+  
   file_close(cur->fdt[fd]);
   cur->fdt[fd] = NULL;
+
   lock_release(&filesys_lock);
+  
 }
 
 /* filesize 시스템 콜 */
@@ -511,5 +547,6 @@ unsigned tell(int fd)
   lock_release(&filesys_lock);
   return position;
 }
+
 
 
