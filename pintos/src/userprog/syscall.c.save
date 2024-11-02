@@ -35,9 +35,7 @@ tid_t exec(const char *file);
 void check_valid_vaddr(const void *vaddr);
 void check_valid_buffer(const void *buffer, unsigned size);
 void check_valid_string(const char *str);
-struct file *validate_fd(int fd);
-bool is_closing_executable_file(struct file *file);
-bool is_opening_executable_file(const char *file);
+
 
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
@@ -47,7 +45,6 @@ int filesize (int fd);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
-
 
 // 사용자 주소 유효성 검사 함수
 void check_valid_vaddr(const void *vaddr) {
@@ -69,50 +66,16 @@ void check_valid_buffer(const void *buffer, unsigned size) {
 }
 
 /* 문자열의 유효성 검사 함수 */
-void check_valid_string(const char *str) {
-    const char *current_char = str;               // 현재 문자 포인터
-    check_valid_vaddr((const void *)current_char); // 첫 번째 문자 주소 유효성 검사
-    
-    while (*current_char) {                        // 문자열 끝까지 반복
-        check_valid_vaddr((const void *)current_char); // 각 문자의 주소 유효성 검사
-        current_char++;                            // 다음 문자로 이동
-    }
+void check_valid_string(const char *str)
+{
+  check_valid_vaddr((const void *)str);
+  while (*str != '\0')
+  {
+    check_valid_vaddr((const void *)str);
+    str++;
+  }
 }
 
-
-bool is_closing_executable_file(struct file *file) {
-
-     struct thread *cur = thread_current();
-    return (file == cur->exec_file);
-}
-
-bool is_opening_executable_file(const char *file) {
-     struct thread *cur = thread_current();
-    return (strcmp(file, cur->name) == 0);
-}
-
-
-
-// 추가 
-/* 파일 디스크립터를 검증 후,
- -> 유효한 경우 해당 파일 포인터 반환
- -> 유효하지 않은 경우 프로세스를 종료*/
-struct file *validate_fd(int fd) {
-    struct thread *cur = thread_current();
-
-    /* 유효x-1 fd가 0 또는 1인 경우는 유효하지 않음 */
-    if (fd == 0 || fd == 1) {
-        exit(-1);
-    }
-
-    /* 유효x-2 fd가 2 이상이고, 현재 스레드의 next_fd 미만이며, fdt[fd]가 NULL이 아닌 경우 */
-    if (fd >= 2 && fd < cur->next_fd && cur->fdt[fd] != NULL) {
-        return cur->fdt[fd];
-    }
-
-    /* 그 외의 경우 유효하지 않음 */
-    exit(-1);
-}
 
 
 void syscall_init(void) {
@@ -130,7 +93,7 @@ static void syscall_handler(struct intr_frame *f UNUSED) {
     // esp+4가 유효한 사용자 주소인지 확인
     if (!is_user_vaddr(f->esp + 4)) {
         exit(-1);  // 잘못된 스택 포인터일 경우 프로세스 종료
-    }
+    }   
 
     switch (*(uint32_t *)(f->esp)) {
         case SYS_HALT:
@@ -429,6 +392,32 @@ bool remove(const char *file)
 }
 
 /* open 시스템 콜 */
+/*int open(const char *file)
+{
+  check_valid_string(file);
+  lock_acquire(&filesys_lock);
+  struct file *opened_file = filesys_open(file);
+  if (opened_file == NULL)
+  {
+    lock_release(&filesys_lock);
+    return -1;
+  }
+ struct thread *cur = thread_current();
+  
+  // 파일 이름 비교하여 실행 파일인지 확인
+  if (strcmp(file, cur->name) == 0)
+  {
+    // 실행 파일인 경우 쓰기 거부
+    file_deny_write(opened_file);
+  }
+
+  int fd = cur->next_fd;
+  cur->fdt[fd] = opened_file;
+  cur->next_fd++;
+  lock_release(&filesys_lock);
+  return fd;
+}
+*/
 
 int open(const char *file)
 {
@@ -450,7 +439,8 @@ int open(const char *file)
 //  printf("open(): filesys_open()이 파일 '%s'에 대해 성공함\n", file);
   //  printf("open(): 파일 '%s'을(를) 스레드 이름 '%s'과(와) 비교 중\n", file, cur->name);
  // 파일 이름을 비교하여 실행 파일인지 확인
-if (is_opening_executable_file(file)) 
+  if (strcmp(file, cur->name) == 0)
+//    if (cur->exec_file != NULL && opened_file->inode == cur->exec_file->inode) 
  {
     //        printf("open(): 파일 '%s'에 대한 쓰기 접근을 거부함\n", file);
 
@@ -469,26 +459,49 @@ if (is_opening_executable_file(file))
 }
 
 /* close 시스템 콜 */
-
+/*
 void close(int fd)
 {
+  struct thread *cur = thread_current();
+  if (fd < 2 || fd >= cur->next_fd || cur->fdt[fd] == NULL)
+  {
+    exit(-1);
+  }
+  lock_acquire(&filesys_lock);
 
-struct file *file = validate_fd(fd); 
- struct thread *cur = thread_current();
+   // 실행 파일인지 확인
+  if (cur->fdt[fd] == cur->exec_file)
+  {
+   // file_allow_write(cur->fdt[fd]);
+    cur->exec_file = NULL;
+  }
 
+
+  file_close(cur->fdt[fd]);
+  cur->fdt[fd] = NULL;
+  lock_release(&filesys_lock);
+}
+*/
+void close(int fd)
+{
+  struct thread *cur = thread_current();
+  if (fd < 2 || fd >= cur->next_fd || cur->fdt[fd] == NULL)
+  {
+    exit(-1);
+  }
   lock_acquire(&filesys_lock);
 
 
   // 실행 파일인지 확인
-  // file이랑 cur->fdt[fd]랑 동일함 
- if (is_closing_executable_file(file)) 
+  
+  if (cur->fdt[fd] == cur->exec_file)
   {
-    file_allow_write(file);
+    file_allow_write(cur->fdt[fd]);
     cur->exec_file = NULL;
   }
 
   
-  file_close(file);
+  file_close(cur->fdt[fd]);
   cur->fdt[fd] = NULL;
 
   lock_release(&filesys_lock);
@@ -498,11 +511,13 @@ struct file *file = validate_fd(fd);
 /* filesize 시스템 콜 */
 int filesize(int fd)
 {
-
-  struct file *file = validate_fd(fd);  // 파일 디스크립터 검증 및 파일 포인터 반환
-
+  struct thread *cur = thread_current();
+  if (fd < 2 || fd >= cur->next_fd || cur->fdt[fd] == NULL)
+  {
+    exit(-1);
+  }
   lock_acquire(&filesys_lock);
-  int size = file_length(file);
+  int size = file_length(cur->fdt[fd]);
   lock_release(&filesys_lock);
   return size;
 }
@@ -511,26 +526,28 @@ int filesize(int fd)
 /* seek 시스템 콜 */
 void seek(int fd, unsigned position)
 {
- 
- 
- struct file *file = validate_fd(fd); 
+  struct thread *cur = thread_current();
+  if (fd < 2 || fd >= cur->next_fd || cur->fdt[fd] == NULL)
+  {
+    exit(-1);
+  }
   lock_acquire(&filesys_lock);
-  file_seek(file, position);
+  file_seek(cur->fdt[fd], position);
   lock_release(&filesys_lock);
 }
 
 /* tell 시스템 콜 */
 unsigned tell(int fd)
 {
-
-struct file *file = validate_fd(fd); 
-
-
+  struct thread *cur = thread_current();
+  if (fd < 2 || fd >= cur->next_fd || cur->fdt[fd] == NULL)
+  {
+    exit(-1);
+  }
   lock_acquire(&filesys_lock);
-  unsigned position = file_tell(file);
+  unsigned position = file_tell(cur->fdt[fd]);
   lock_release(&filesys_lock);
   return position;
 }
-
 
 
