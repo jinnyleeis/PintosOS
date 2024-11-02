@@ -7,6 +7,7 @@
 #include "threads/synch.h"   // 세마포어 사용을 위해 추가
 #include "filesys/file.h"  // 추가: struct file의 정의를 포함
 
+#define FDT_MAX 128 
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -109,8 +110,10 @@ struct thread
     bool exited;  // 종료 상태를 저장하는 변수 추가
     bool wrong_exit;  // 잘못된 종료 상태를 저장하는 변수 추가
 
+
+    int reserved_entry[2];  // 0: stdin, 1: stdout
      /* 파일 디스크립터 테이블 추가 */
-    struct file *fdt[128]; /* 파일 디스크립터 테이블 */
+    struct file *fdt[FDT_MAX]; /* 파일 디스크립터 테이블 */
     int next_fd;           /* 다음에 할당할 파일 디스크립터 번호 */
     struct file *exec_file; /* 실행 파일에 대한 파일 포인터 */
 

@@ -525,11 +525,16 @@ init_thread (struct thread *t, const char *name, int priority)
     t->parent = NULL;
   }
 
+    t->reserved_entry[0] = 0; // stdin
+    t->reserved_entry[1] = 1; // stdout
     /* 파일 디스크립터 테이블 초기화 */
-  t->next_fd = 2; /* fd 0과 1은 표준 입출력으로 예약 */
-  for (int i = 0; i < 128; i++) {
-    t->fdt[i] = NULL;
-}
+     t->next_fd = (sizeof(t->reserved_entry) / sizeof(t->reserved_entry[0])); // 예약된 항목의 개수로 초기화
+
+  for (int i = 0; i < FDT_MAX; i++) {
+        t->fdt[i] = NULL; // 모든 파일 디스크립터를 NULL로 초기화
+    }
+
+    
     t->suppress_exit_msg = false;  // 플래그 초기화
 
   t->exec_file = NULL;  // 실행 파일에 대한 파일 포인터 초기화

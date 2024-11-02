@@ -1,10 +1,10 @@
+#include <string.h>
 #include "userprog/process.h"
 #include <debug.h>
 #include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 //implicit declaration of function ‘free’ , implicit declaration of function ‘malloc’ 해결
 #include "threads/malloc.h"
 #include "userprog/gdt.h"
@@ -19,6 +19,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "lib/string.h"
 
 
 static thread_func start_process NO_RETURN;
