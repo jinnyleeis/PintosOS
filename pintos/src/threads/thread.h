@@ -9,6 +9,18 @@
 
 #define FDT_MAX 128 
 
+
+// 플젝3------------------------------------
+
+#ifndef USERPROG
+// project3 
+extern bool thread_prior_aging;
+#endif
+
+#ifndef USERPROG
+void thread_aging(void);
+#endif
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
