@@ -56,6 +56,19 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
+// 플젝3 ---------------------
+#ifndef USERPROG
+// project3 
+bool thread_prior_aging;
+#endif
+
+
+#ifndef USERPROG
+void thread_aging(void);
+#endif
+
+// 플젝3 ----------------------
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -75,12 +88,34 @@ static tid_t allocate_tid (void);
 // 새로 추가 
 struct thread *get_thread_by_tid(tid_t tid);
 
+// 플젝3 ----------------------
+#ifndef USERPROG
+/* 에이징을 통해 ready_list에 있는 모든 스레드의 우선순위를 증가시킴. */
+void thread_aging(void) {
+    struct list_elem *e;
+    struct thread *t;
+
+    /* ready_list를 순회 ->  각 스레드의 우선순위를 증가. */
+    for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)) {
+        t = list_entry(e, struct thread, elem);
+
+        /* 우선순위가 최대값을 넘지 않도록 함 */
+        if (t->priority < PRI_MAX) {
+            t->priority += 1;
+        }
+    }
+}
+#endif
+
 
 // 새로 추가 함수
 /* why? Pintos는 모든 스레드를 all_list라는 리스트로 관리하기 떄문에,
 특정 TID를 가진 스레드를 찾으려면 이 리스트를 순회해야한다. 
 process_execute(), process_wait(), exec(), wait() 등의 함수에서 자식 스레드를 찾을 때 사용함
 input : tid_t tid  - 찾고자 하는 스레드의 식별자
+
+
+
 해당 tid를 가진 스레드의 포인터를 반환
 */
 struct thread *get_thread_by_tid(tid_t tid)
@@ -166,7 +201,13 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
-}
+
+  //project3 
+   #ifndef USERPROG
+//	thread_wake_up();
+	if(thread_prior_aging==true){thread_aging();}
+   #endif
+   }
 
 /* Prints thread statistics. */
 void
