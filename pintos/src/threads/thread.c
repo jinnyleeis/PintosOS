@@ -107,6 +107,7 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 // 새로 추가 
 struct thread *get_thread_by_tid(tid_t tid);
+void test_max_priority(void);
 
 // 플젝3 ----------------------
 #ifndef USERPROG
@@ -446,7 +447,19 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+//  thread_current ()->priority = new_priority;
+if (current_scheduling_mode == SCHEDULING_MLFQS)return;
+  else if (current_scheduling_mode == SCHEDULING_PRIORITY)
+  {
+
+  enum intr_level old_level = intr_disable();
+  int old_priority = thread_current()->priority;
+  thread_current()->priority = new_priority;
+
+  if (new_priority < old_priority)
+    test_max_priority();
+
+  intr_set_level (old_level);}
 }
 
 /* Returns the current thread's priority. */
@@ -860,6 +873,21 @@ thread_awake(int64_t current_ticks)
         }
     }
 }
+
+
+
+// 최대 우선순위 테스트 함수void
+void test_max_priority(void)
+{
+  
+  if (!list_empty(&ready_list))
+    {
+      struct thread *max_ready_t_ = list_entry(list_front(&ready_list), struct thread, elem);
+      if(thread_current()->priority < max_ready_t_->priority){thread_yield();}
+    }
+}
+
+
 
 /// 스케줄링 모드 set
 void thread_set_scheduling_mode(bool mlfqs) {
