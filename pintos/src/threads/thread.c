@@ -694,6 +694,57 @@ allocate_tid (void)
   return tid;
 }
 
+
+// 프로젝트3을위한 각각의 함수들을 구현한 부분입니다!
+
+// 3- mlfq를 위한 구현
+
+
+/* Fixed-point operation function */
+fixed_point_t
+fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B, fixed_point_t C)
+{
+  switch (op)
+    {
+    case FP_ADD_OP:
+      return A + C;
+
+    case FP_SUB_OP:
+      return A - C;
+
+    case FP_MUL_INT_OP:
+      return A * B;
+
+    case FP_DIV_INT_OP:
+      return A / B;
+
+    case FP_MUL_OP:
+      return ((fixed_point_t)(((int64_t) A) * C >> FP_SHIFT_AMOUNT));
+
+    case FP_DIV_OP:
+      return ((fixed_point_t)((((int64_t) A) << FP_SHIFT_AMOUNT) / C));
+
+    case FP_ADD_INT_OP:
+      return A + (B << FP_SHIFT_AMOUNT);
+
+    case FP_SUB_INT_OP:
+      return A - (B << FP_SHIFT_AMOUNT);
+
+    case FP_INT_PART_OP:
+      return A >> FP_SHIFT_AMOUNT;
+
+    case FP_ROUND_OP:
+      return (A >= 0 ? ((A + (1 << (FP_SHIFT_AMOUNT - 1))) >> FP_SHIFT_AMOUNT)
+                    : ((A - (1 << (FP_SHIFT_AMOUNT - 1))) >> FP_SHIFT_AMOUNT));
+
+    default:
+    // 존재하지 않는 연산
+        return 0;
+    }
+}
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+
