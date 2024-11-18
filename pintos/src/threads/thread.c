@@ -75,10 +75,24 @@ void thread_aging(void);
 bool thread_mlfqs;
 scheduling_mode_t current_scheduling_mode = SCHEDULING_PRIORITY;  /* 기본값: 우선순위 기반 */
 
+// 계산 함수
+fixed_point_t fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B, fixed_point_t C);
 
+// 매크로
+#define FP_ADD(A, C) fixed_point_operation(FP_ADD_OP, (A), 0, (C))
+#define FP_SUB(A, C) fixed_point_operation(FP_SUB_OP, (A), 0, (C))
+#define FP_MUL_INT(A, B) fixed_point_operation(FP_MUL_INT_OP, (A), (B), 0)
+#define FP_DIV_INT(A, B) fixed_point_operation(FP_DIV_INT_OP, (A), (B), 0)
+#define FP_MUL(A, C) fixed_point_operation(FP_MUL_OP, (A), 0, (C))
+#define FP_DIV(A, C) fixed_point_operation(FP_DIV_OP, (A), 0, (C))
+#define FP_ADD_INT(A, B) fixed_point_operation(FP_ADD_INT_OP, (A), (B), 0)
+#define FP_SUB_INT(A, B) fixed_point_operation(FP_SUB_INT_OP, (A), (B), 0)
+#define FP_INT_PART(A) fixed_point_operation(FP_INT_PART_OP, (A), 0, 0)
+#define FP_ROUND(A) fixed_point_operation(FP_ROUND_OP, (A), 0, 0)
+#define FP_CONST(x) fixed_point_operation(FP_CONST_OP, (x), 0, 0)
 // 플젝3 새로 추가 프로토타입
 bool cmp_wake_up_time(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -323,7 +337,9 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+ // list_push_back (&ready_list, &t->elem);
+
+  list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -394,7 +410,9 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  //  list_push_back (&ready_list, &cur->elem);
+   list_insert_ordered(&ready_list, &cur->elem, cmp_priority, NULL);
+
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -547,7 +565,18 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
+
+     if(current_scheduling_mode == SCHEDULING_PRIORITY){
+        t->priority = priority;
+      }
+      else if(current_scheduling_mode == SCHEDULING_MLFQS){
+      t->nice = thread_current() ? thread_current()->nice : 0;
+      t->recent_cpu = thread_current() ? thread_current()->recent_cpu : FP_CONST(0);
+//      calculate_priority(t, NULL);
+         
+   
+  }
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
@@ -719,6 +748,23 @@ cmp_wake_up_time(const struct list_elem *a, const struct list_elem *b, void *aux
     return false;
 }
 
+
+// 우선순위 비교함수
+
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *t_a = list_entry(a, struct thread, elem);
+  struct thread *t_b = list_entry(b, struct thread, elem);
+if(t_a->priority > t_b->priority){
+    // 우선순위는 큰게 더 높은 것임 
+    return true;
+
+}else{
+    return false;
+}
+}
+
+
 /* Put the current thread to sleep until ticks */
 void
 thread_sleep(int64_t ticks)
@@ -781,6 +827,8 @@ fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B, fixed_point_t
       return (A >= 0 ? ((A + (1 << (FP_SHIFT_AMOUNT - 1))) >> FP_SHIFT_AMOUNT)
                     : ((A - (1 << (FP_SHIFT_AMOUNT - 1))) >> FP_SHIFT_AMOUNT));
 
+    case FP_CONST_OP:
+        return (A << FP_SHIFT_AMOUNT);
     default:
     // 존재하지 않는 연산
         return 0;

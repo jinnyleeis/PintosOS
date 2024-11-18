@@ -114,7 +114,8 @@ typedef enum {
     FP_ADD_INT_OP,
     FP_SUB_INT_OP,
     FP_INT_PART_OP,
-    FP_ROUND_OP
+    FP_ROUND_OP,
+    FP_CONST_OP
 } fixed_point_op_t;
 
 // 스케줄링 모드 확인위한 enum 추가 
@@ -210,6 +211,8 @@ void thread_foreach (thread_action_func *, void *);
 // 우선순위 관련 함수들 
 int thread_get_priority (void);
 void thread_set_priority (int);
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
 
 // mlfq 용 함수들
 int thread_get_nice (void);
@@ -231,8 +234,7 @@ void thread_awake(int64_t ticks);
 bool cmp_wake_up_time(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 // 스케줄링 모드 명확하게 구분 위해 알맞게 동작할 수 있도록 하는 함수
-void thread_set_scheduling_mode(scheduling_mode_t mode);// set
-scheduling_mode_t thread_get_scheduling_mode(void); // get
+void thread_set_scheduling_mode(bool mlfqs);// set
  
 
 #endif /* threads/thread.h */
