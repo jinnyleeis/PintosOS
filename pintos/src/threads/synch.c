@@ -32,6 +32,9 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+ bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -48,6 +51,7 @@ sema_init (struct semaphore *sema, unsigned value)
 
   sema->value = value;
   list_init (&sema->waiters);
+
 }
 
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
@@ -68,8 +72,9 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
-      thread_block ();
+//      list_push_back (&sema->waiters, &thread_current ()->elem);
+        list_insert_ordered(&sema->waiters, &thread_current()->elem, cmp_priority, NULL);
+    thread_block ();
     }
   sema->value--;
   intr_set_level (old_level);
@@ -109,14 +114,24 @@ void
 sema_up (struct semaphore *sema) 
 {
   enum intr_level old_level;
+  struct thread *t = NULL;
 
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  if (!list_empty (&sema->waiters)){
+   // thread_unblock (list_entry (list_pop_front (&sema->waiters),
+     //                           struct thread, elem));
+ t = list_entry (list_pop_front (&sema->waiters), struct thread, elem);
+      thread_unblock (t);}
+
   sema->value++;
+
+// 해제된 스레드가 현재 스레드보다 우선순위가 높으면 선점
+  	test_max_priority();
+
+
+
   intr_set_level (old_level);
 }
 
