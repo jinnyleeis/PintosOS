@@ -180,6 +180,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+// 자고 있는 스레드 틱 지났으면꺠움
+thread_awake(ticks); 
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

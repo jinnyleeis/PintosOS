@@ -785,6 +785,24 @@ fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B, fixed_point_t
     }
 }
 
+void
+thread_awake(int64_t current_ticks)
+{
+    /* 계속해서 sleep_list의 첫 번째 요소를 확인 */
+    while (!list_empty(&sleep_list)) {
+        struct thread *t = list_entry(list_front(&sleep_list), struct thread, elem);
+        
+        /* 현재 틱보다 작거나 같으면 해제 */
+        if (t->wake_up_time <= current_ticks) {
+            list_pop_front(&sleep_list);
+            thread_unblock(t);
+        }
+        else {
+            /* 첫 번째 요소가 조건을 만족하지 않으면 더 이상 검사할 필요 없음 */
+            break;
+        }
+    }
+}
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
