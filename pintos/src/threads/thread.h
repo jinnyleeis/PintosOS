@@ -21,6 +21,8 @@ extern bool thread_prior_aging;
 void thread_aging(void);
 #endif
 
+// 3번 - mlfq
+#define FP_SHIFT_AMOUNT 14  /* Number of fractional bits */
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -98,6 +100,7 @@ typedef int tid_t;
    blocked state is on a semaphore wait list. */
 
 typedef int fixed_point_t; // mlfq에서 부동소수점 연산에 활용위해 추가
+
 
 // 부동 소수점 연산 종류 enum 
 /* Fixed-point operations */
