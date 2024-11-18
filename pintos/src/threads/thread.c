@@ -73,6 +73,8 @@ void thread_aging(void);
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
+scheduling_mode_t current_scheduling_mode = SCHEDULING_PRIORITY;  /* 기본값: 우선순위 기반 */
+
 
 // 플젝3 새로 추가 프로토타입
 bool cmp_wake_up_time(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
@@ -803,6 +805,18 @@ thread_awake(int64_t current_ticks)
         }
     }
 }
+
+/// 스케줄링 모드 set
+void thread_set_scheduling_mode(bool mlfqs) {
+    enum intr_level old_level = intr_disable();
+if(!mlfqs){
+    current_scheduling_mode = SCHEDULING_PRIORITY; }
+else{ current_scheduling_mode =SCHEDULING_MLFQS; }
+
+    intr_set_level(old_level);
+}
+
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
