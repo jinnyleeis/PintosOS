@@ -99,6 +99,22 @@ typedef int tid_t;
 
 typedef int fixed_point_t; // mlfq에서 부동소수점 연산에 활용위해 추가
 
+// 부동 소수점 연산 종류 enum 
+/* Fixed-point operations */
+typedef enum {
+    FP_ADD_OP,
+    FP_SUB_OP,
+    FP_MUL_INT_OP,
+    FP_DIV_INT_OP,
+    FP_MUL_OP,
+    FP_DIV_OP,
+    FP_ADD_INT_OP,
+    FP_SUB_INT_OP,
+    FP_INT_PART_OP,
+    FP_ROUND_OP
+} fixed_point_op_t;
+
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -190,6 +206,10 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+// mlfq의 연산에서 활용돠는 
+fixed_point_t fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B, fixed_point_t C);
+
 
 // 새로 추가
 struct thread *get_thread_by_tid(tid_t tid);
