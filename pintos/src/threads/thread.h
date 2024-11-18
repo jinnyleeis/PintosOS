@@ -96,6 +96,9 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+typedef int fixed_point_t; // mlfq에서 부동소수점 연산에 활용위해 추가
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -108,6 +111,7 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -123,6 +127,7 @@ struct thread
     bool wrong_exit;  // 잘못된 종료 상태를 저장하는 변수 추가
 
 
+
     int reserved_entry[2];  // 0: stdin, 1: stdout
      /* 파일 디스크립터 테이블 추가 */
     struct file *fdt[FDT_MAX]; /* 파일 디스크립터 테이블 */
@@ -135,7 +140,18 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-  };
+      
+ /* MLFQS scheduler 관련 필드 */
+    int nice;                           
+    fixed_point_t recent_cpu;           /* Recent CPU usage */
+
+    /* 알람 클럭 관련 필드 */
+    int64_t wake_up_time;               /* Tick to wake up at */
+
+ };
+
+// 전체 sleep threads를 한번에 관리하는 전역 슬립 리스트 추가 
+extern struct list sleep_list;
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -165,9 +181,11 @@ void thread_yield (void);
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
 
+// 우선순위 관련 함수들 
 int thread_get_priority (void);
 void thread_set_priority (int);
 
+// mlfq 용 함수들
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
@@ -176,4 +194,12 @@ int thread_get_load_avg (void);
 // 새로 추가
 struct thread *get_thread_by_tid(tid_t tid);
 
+
+// 알람 클럭 함수들 
+void thread_sleep(int64_t ticks);
+void thread_awake(int64_t ticks);
+bool cmp_wake_up_time(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
+
 #endif /* threads/thread.h */
+
