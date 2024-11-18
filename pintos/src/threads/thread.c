@@ -301,6 +301,13 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+
+
+  // 선점 여부 확인 - 즉, 현재 만들어진것보다, 새로 만들어진게 더 우선순위 높으면
+  // 현재꺼 그만둘수 있게끔 한다!!
+  if (t->priority > thread_current()->priority)
+    thread_yield();
+
   return tid;
 }
 
