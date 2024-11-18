@@ -117,6 +117,13 @@ typedef enum {
     FP_ROUND_OP
 } fixed_point_op_t;
 
+// 스케줄링 모드 확인위한 enum 추가 
+// 기본이 priority임 
+typedef enum {
+    SCHEDULING_PRIORITY,    /* 우선순위 기반 스케줄러 */
+    SCHEDULING_MLFQS        /* 멀티레벨 피드백 큐 스케줄러 */
+} scheduling_mode_t;
+
 
 struct thread
   {
@@ -223,6 +230,10 @@ void thread_sleep(int64_t ticks);
 void thread_awake(int64_t ticks);
 bool cmp_wake_up_time(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
+// 스케줄링 모드 명확하게 구분 위해 알맞게 동작할 수 있도록 하는 함수
+void thread_set_scheduling_mode(scheduling_mode_t mode);// set
+scheduling_mode_t thread_get_scheduling_mode(void); // get
+ 
 
 #endif /* threads/thread.h */
 
