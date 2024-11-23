@@ -11,10 +11,12 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "devices/timer.h" // 추가
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "threads/synch.h"   // 세마포어 사용을 위해 추가
-
+//#include "devices/timer.h" // 추가
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -119,7 +121,8 @@ static tid_t allocate_tid (void);
 // 새로 추가 
 struct thread *get_thread_by_tid(tid_t tid);
 void test_max_priority(void);
-
+int thread_get_load_avg (void);
+int thread_get_recent_cpu (void);
 // 플젝3 ----------------------
 #ifndef USERPROG
 /* 에이징을 통해 ready_list에 있는 모든 스레드의 우선순위를 증가시킴. */
@@ -213,6 +216,8 @@ thread_start (void)
 
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
+
+  load_avg = FP_CONST(0);
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -235,6 +240,30 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+
+  if(current_scheduling_mode == SCHEDULING_MLFQS){
+
+
+        /* Increase recent_cpu by 1 for the running thread */
+        if (t != idle_thread)
+            t->recent_cpu = FP_ADD(t->recent_cpu, FP_CONST(1));
+
+        /* Every second, update load_avg and recent_cpu for all threads */
+        if (timer_ticks() % TIMER_FREQ == 0)
+        {
+            calculate_load_avg();
+            thread_foreach(calculate_recent_cpu, NULL);
+        }
+
+        /* Every 4 ticks, update priority for all threads */
+        if (timer_ticks() % TIME_SLICE == 0)
+        {
+            thread_foreach(calculate_priority, NULL);
+            /* Re-sort ready_list based on new priorities */
+            list_sort(&ready_list, cmp_priority, NULL);
+        }
+}
+
 
   //project3 
    #ifndef USERPROG
@@ -515,21 +544,21 @@ thread_get_nice (void)
 }
 
 /* Returns 100 times the system load average. */
-int
-thread_get_load_avg (void) 
-{
+//int
+//thread_get_load_avg (void) 
+//{
   /* Not yet implemented. */
-  return 0;
-}
+ // return 0;
+//}
 
 /* Returns 100 times the current thread's recent_cpu value. */
-int
-thread_get_recent_cpu (void) 
-{
+//int
+//thread_get_recent_cpu (void) 
+//{
   /* Not yet implemented. */
-  return 0;
-}
-
+ // return 0;
+//}
+
 /* Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
@@ -620,10 +649,17 @@ init_thread (struct thread *t, const char *name, int priority)
         t->priority = priority;
       }
       else if(current_scheduling_mode == SCHEDULING_MLFQS){
-      t->nice = thread_current() ? thread_current()->nice : 0;
-      t->recent_cpu = thread_current() ? thread_current()->recent_cpu : FP_CONST(0);
-//      calculate_priority(t, NULL);
-         
+ if (t == initial_thread)
+        {
+            t->nice = 0;
+            t->recent_cpu = FP_CONST(0);
+        }
+        else
+        {
+            t->nice = thread_current()->nice;
+            t->recent_cpu = thread_current()->recent_cpu;
+        }
+        calculate_priority(t, NULL);         
    
   }
 
@@ -954,13 +990,10 @@ calculate_recent_cpu(struct thread *t, void *aux UNUSED)
   if (t == idle_thread)
     return;
     /* recent_cpu = (2 * load_avg) / (2 * load_avg + 1) * recent_cpu + nice */
-    fixed_point_t coef_num = FP_MUL_INT(load_avg, 2);
-    fixed_point_t coef_den = FP_ADD_INT(FP_MUL_INT(load_avg, 2), 1);
-    fixed_point_t coefficient = FP_DIV(coef_num, coef_den);
-    fixed_point_t temp = FP_MUL(coefficient, t->recent_cpu);
-    temp = FP_ADD_INT(temp, t->nice);
-    t->recent_cpu = temp;
-
+fixed_point_t coef1 = FP_MUL_INT(load_avg, 2);
+    fixed_point_t coef2 = FP_ADD_INT(coef1, 1);
+    fixed_point_t coefficient = FP_DIV(coef1, coef2);
+    t->recent_cpu = FP_ADD_INT(FP_MUL(coefficient, t->recent_cpu), t->nice);
 
 }
 
@@ -973,10 +1006,31 @@ calculate_load_avg(void)
     ready_threads++;
  
   /* load_avg = (59/60) * load_avg + (1/60) * ready_threads */
-    fixed_point_t term1 = FP_DIV_INT(load_avg, 60) * 59;
-    fixed_point_t term2 = FP_DIV_INT(FP_CONST(ready_threads), 60);
-    load_avg = FP_ADD(term1, term2);}
+  fixed_point_t coef1 = FP_DIV_INT(FP_CONST(59), 60);
+    fixed_point_t coef2 = FP_DIV_INT(FP_CONST(1), 60);
+    fixed_point_t term1 = FP_MUL(coef1, load_avg);
+    fixed_point_t term2 = FP_MUL_INT(coef2, ready_threads);
+    load_avg = FP_ADD(term1, term2);
+}
 
+
+int
+thread_get_load_avg (void) 
+{
+    enum intr_level old_level = intr_disable();
+    int load_avg_int = FP_ROUND(FP_MUL_INT(load_avg, 100));
+    intr_set_level(old_level);
+    return load_avg_int;
+}
+
+int
+thread_get_recent_cpu (void) 
+{
+    enum intr_level old_level = intr_disable();
+    int recent_cpu_int = FP_ROUND(FP_MUL_INT(thread_current()->recent_cpu, 100));
+    intr_set_level(old_level);
+    return recent_cpu_int;
+}
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
