@@ -123,6 +123,13 @@ struct thread *get_thread_by_tid(tid_t tid);
 void test_max_priority(void);
 int thread_get_load_avg (void);
 int thread_get_recent_cpu (void);
+
+// thread_tick에서 활용할 함수들
+static void update_recent_cpu(struct thread *t);
+static void update_load_avg_and_recent_cpu(void);
+static void update_priority_and_yield(void);
+
+
 // 플젝3 ----------------------
 #ifndef USERPROG
 /* 에이징을 통해 ready_list에 있는 모든 스레드의 우선순위를 증가시킴. */
@@ -222,55 +229,71 @@ thread_start (void)
 
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
+
+
+
 void
 thread_tick (void) 
 {
-  struct thread *t = thread_current ();
+    struct thread *t = thread_current ();
+    int64_t ticks = timer_ticks();  // 현재 타이머 틱
 
-  /* Update statistics. */
-  if (t == idle_thread)
-    idle_ticks++;
+    /* Update statistics. */
+    if (t == idle_thread)
+        idle_ticks++;
 #ifdef USERPROG
-  else if (t->pagedir != NULL)
-    user_ticks++;
+    else if (t->pagedir != NULL)
+        user_ticks++;
 #endif
-  else
-    kernel_ticks++;
+    else
+        kernel_ticks++;
 
-  /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
-    intr_yield_on_return ();
+    /* Enforce preemption. */
+    if (++thread_ticks >= TIME_SLICE)
+        intr_yield_on_return ();
 
-  if(current_scheduling_mode == SCHEDULING_MLFQS){
+    switch (current_scheduling_mode)
+    {
+        case SCHEDULING_PRIORITY:
+            /* 우선순위 기반 스케줄러의 경우 특별한 처리가 없다면 생략 가능합니다. */
+            break;
 
+        case SCHEDULING_MLFQS:
+            /* MLFQS 관련 코드 */
+             update_recent_cpu(t);
 
-        /* Increase recent_cpu by 1 for the running thread */
-        if (t != idle_thread)
-            t->recent_cpu = FP_ADD(t->recent_cpu, FP_CONST(1));
+             /* 매 1초마다 (ticks가 TIMER_FREQ의 배수인 경우) */
+             bool is_one_second_elapsed = (ticks % TIMER_FREQ == 0);
 
-        /* Every second, update load_avg and recent_cpu for all threads */
-        if (timer_ticks() % TIMER_FREQ == 0)
-        {
-            calculate_load_avg();
-            thread_foreach(calculate_recent_cpu, NULL);
-        }
+            /* Every second, update load_avg and recent_cpu for all threads */
+            if (is_one_second_elapsed){
+               update_load_avg_and_recent_cpu();
+            }
 
-        /* Every 4 ticks, update priority for all threads */
-        if (timer_ticks() % TIME_SLICE == 0)
-        {
-            thread_foreach(calculate_priority, NULL);
-            /* Re-sort ready_list based on new priorities */
-            list_sort(&ready_list, cmp_priority, NULL);
-        }
+           /* 매 타임 슬라이스마다 (ticks가 TIME_SLICE의 배수인 경우) */
+           bool is_time_slice_elapsed = (ticks % TIME_SLICE == 0);
+           if (is_time_slice_elapsed)
+            {
+              update_priority_and_yield();
+            }
+            break;
+
+        default:
+            // x 
+            break;
+    }
+
+    /* 프로젝트 3: 에이징 */
+#ifndef USERPROG
+    if(thread_prior_aging == true)
+        thread_aging();
+#endif
 }
 
 
-  //project3 
-   #ifndef USERPROG
-//	thread_wake_up();
-	if(thread_prior_aging==true){thread_aging();}
-   #endif
-   }
+
+
+
 
 /* Prints thread statistics. */
 void
@@ -954,7 +977,6 @@ void test_max_priority(void)
 }
 
 
-
 /// 스케줄링 모드 set
 void thread_set_scheduling_mode(bool mlfqs) {
     enum intr_level old_level = intr_disable();
@@ -1032,9 +1054,43 @@ thread_get_recent_cpu (void)
     return recent_cpu_int;
 }
 
+
+// load avg 계산 관련
+static void update_recent_cpu(struct thread *t)
+{
+    if (t != idle_thread)
+    {
+        t->recent_cpu = FP_ADD(t->recent_cpu, FP_CONST(1));
+    }
+}
+
+static void update_load_avg_and_recent_cpu(void)
+{
+    calculate_load_avg();
+    thread_foreach(calculate_recent_cpu, NULL);
+}
+
+static void update_priority_and_yield(void)
+{
+    thread_foreach(calculate_priority, NULL);
+    list_sort(&ready_list, cmp_priority, NULL);
+
+    struct thread *t = thread_current();
+    if (!list_empty(&ready_list))
+    {
+        struct thread *front = list_entry(list_front(&ready_list), struct thread, elem);
+        if (front->priority > t->priority)
+        {
+            intr_yield_on_return();
+        }
+    }
+}
+
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
 
 
 
