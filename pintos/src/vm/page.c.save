@@ -1,0 +1,148 @@
+#include "vm/page.h"
+#include "threads/malloc.h"
+#include "threads/vaddr.h"
+#include "threads/palloc.h"
+#include "threads/thread.h"
+#include "userprog/pagedir.h"
+#include "filesys/file.h"
+#include "vm/frame.h"
+#include "vm/swap.h"
+#include <string.h>
+
+#include "userprog/supplemental_page_table.h"
+
+
+static unsigned page_hash_func(const struct hash_elem *e, void *aux UNUSED) {
+  const struct suppl_page_table_entry *spte = hash_entry(e, struct suppl_page_table_entry, hash_elem);
+  return hash_bytes(&spte->upage, sizeof spte->upage);
+}
+
+static bool page_less_func(const struct hash_elem *a,
+                            const struct hash_elem *b,
+                            void *aux UNUSED) {
+  const struct suppl_page_table_entry *sa = hash_entry(a, struct suppl_page_table_entry, hash_elem);
+  const struct suppl_page_table_entry *sb = hash_entry(b, struct suppl_page_table_entry, hash_elem);
+  return sa->upage < sb->upage;
+}
+
+void
+page_init (struct hash *spt) {
+  hash_init(spt, page_hash_func, page_less_func, NULL);
+}
+
+void
+page_destroy (struct hash *spt) {
+  struct hash_iterator i;
+  hash_first(&i, spt);
+  while (hash_next(&i)) {
+    struct suppl_page_table_entry *spte = hash_entry(hash_cur(&i), struct suppl_page_table_entry, hash_elem);
+    free(spte);
+  }
+  hash_destroy(spt, NULL);
+}
+
+/* SPTE를 hash에서 찾는 함수 */
+struct suppl_page_table_entry *
+page_lookup (struct hash *spt, void *addr) {
+  struct suppl_page_table_entry spte_tmp;
+  spte_tmp.upage = pg_round_down(addr);
+  struct hash_elem *e = hash_find(spt, &spte_tmp.hash_elem);
+  if (e != NULL)
+    return hash_entry(e, struct suppl_page_table_entry, hash_elem);
+  return NULL;
+}
+
+/* 파일 매핑 페이지 설치 */
+bool
+page_install_file (struct hash *spt, struct file *file, off_t ofs,
+                   uint8_t *upage, uint32_t read_bytes, uint32_t zero_bytes,
+                   bool writable) {
+  struct suppl_page_table_entry *spte = malloc(sizeof(struct suppl_page_table_entry));
+  if (spte == NULL)
+    return false;
+  spte->upage = upage;
+  spte->type = PAGE_FILE;
+  spte->writable = writable;
+  spte->is_loaded = false;
+  spte->file = file;
+  spte->offset = ofs;
+  spte->read_bytes = read_bytes;
+  spte->zero_bytes = zero_bytes;
+  spte->swap_slot = (size_t) -1;
+
+  hash_insert(spt, &spte->hash_elem);
+  return true;
+}
+
+/* zero 페이지 설치 */
+bool
+page_install_zero (struct hash *spt, void *upage, bool writable) {
+  struct suppl_page_table_entry *spte = malloc(sizeof(struct suppl_page_table_entry));
+  if (!spte)
+    return false;
+  spte->upage = upage;
+  spte->type = PAGE_ZERO;
+  spte->writable = writable;
+  spte->is_loaded = false;
+  spte->file = NULL;
+  spte->swap_slot = (size_t)-1;
+
+  hash_insert(spt, &spte->hash_elem);
+  return true;
+}
+
+/* 페이지 로딩: Fault 시 실제 메모리에 올리는 함수 */
+bool
+page_load (struct suppl_page_table_entry *spte) {
+  /* Frame 할당 */
+  void *kpage = frame_alloc(PAL_USER, spte->upage);
+  if (!kpage) return false;
+
+  frame_pin(kpage);
+
+  switch(spte->type) {
+    case PAGE_FILE:
+      file_seek(spte->file, spte->offset);
+      if (file_read(spte->file, kpage, spte->read_bytes) != (int) spte->read_bytes) {
+        frame_unpin(kpage);
+        frame_free(kpage);
+        return false;
+      }
+      memset(kpage + spte->read_bytes, 0, spte->zero_bytes);
+      break;
+    case PAGE_ZERO:
+      memset(kpage, 0, PGSIZE);
+      break;
+    case PAGE_SWAP:
+      swap_in(spte->swap_slot, kpage);
+      break;
+    case PAGE_STACK:
+      memset(kpage, 0, PGSIZE);
+      break;
+    default:
+      frame_unpin(kpage);
+      frame_free(kpage);
+      return false;
+  }
+
+  if(!pagedir_set_page(thread_current()->pagedir, spte->upage, kpage, spte->writable)) {
+    frame_unpin(kpage);
+    frame_free(kpage);
+    return false;
+  }
+
+  spte->is_loaded = true;
+  frame_unpin(kpage);
+  return true;
+}
+
+/* 스택 성장 */
+bool
+grow_stack (void *fault_addr) {
+  if ((size_t)(PHYS_BASE - pg_round_down(fault_addr)) > 8 * 1024 * 1024)
+    return false;
+
+  struct thread *t = thread_current();
+  return page_install_zero(&t->spt, pg_round_down(fault_addr), true);
+}
+

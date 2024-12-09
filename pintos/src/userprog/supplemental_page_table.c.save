@@ -1,0 +1,123 @@
+// userprog/supplemental_page_table.c
+/*
+#include "userprog/supplemental_page_table.h"
+#include <string.h>
+#include "threads/malloc.h"
+#include "threads/synch.h"
+#include "threads/vaddr.h"
+#include "userprog/pagedir.h"
+#include "filesys/file.h"
+#include "threads/palloc.h"
+#include "threads/thread.h" // for thread_current()
+
+// 필요하다면 UNUSED 매크로 정의
+#ifndef UNUSED
+#define UNUSED __attribute__((unused))
+#endif
+
+/* 해시 테이블의 해시 함수 */
+unsigned spt_hash_func(const struct hash_elem *e, void *aux UNUSED) {
+    const struct suppl_page_table_entry *spte = hash_entry(e, struct suppl_page_table_entry, hash_elem);
+    return hash_bytes(&spte->upage, sizeof spte->upage);
+}
+
+/* 해시 테이블의 비교 함수 */
+bool spt_less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED) {
+    const struct suppl_page_table_entry *spte_a = hash_entry(a, struct suppl_page_table_entry, hash_elem);
+    const struct suppl_page_table_entry *spte_b = hash_entry(b, struct suppl_page_table_entry, hash_elem);
+    return spte_a->upage < spte_b->upage;
+}
+
+/* Supplemental Page Table 초기화 */
+void spt_init(struct supplemental_page_table *spt) {
+    hash_init(&spt->pages, spt_hash_func, spt_less_func, NULL);
+    lock_init(&spt->spt_lock);
+}
+
+/* Supplemental Page Table에서 주소로 엔트리 찾기 */
+struct suppl_page_table_entry *spt_lookup(struct supplemental_page_table *spt, void *addr) {
+    void *page_start = pg_round_down(addr);
+    struct suppl_page_table_entry temp;
+    temp.upage = page_start;
+
+    lock_acquire(&spt->spt_lock);
+    struct hash_elem *e = hash_find(&spt->pages, &temp.hash_elem);
+    struct suppl_page_table_entry *result = NULL;
+    if (e != NULL)
+        result = hash_entry(e, struct suppl_page_table_entry, hash_elem);
+    lock_release(&spt->spt_lock);
+    return result;
+}
+
+/* Supplemental Page Table에 엔트리 삽입 */
+bool spt_insert(struct supplemental_page_table *spt, struct suppl_page_table_entry *entry) {
+    lock_acquire(&spt->spt_lock);
+    bool success = (hash_insert(&spt->pages, &entry->hash_elem) == NULL);
+    lock_release(&spt->spt_lock);
+    return success;
+}
+
+/* Supplemental Page Table에서 엔트리 제거 */
+void spt_remove(struct supplemental_page_table *spt, struct suppl_page_table_entry *entry) {
+    lock_acquire(&spt->spt_lock);
+    hash_delete(&spt->pages, &entry->hash_elem);
+    lock_release(&spt->spt_lock);
+    free(entry);
+}
+
+/* Supplemental Page Table 해제 */
+void spt_destroy(struct supplemental_page_table *spt) {
+    lock_acquire(&spt->spt_lock);
+    // 엔트리들을 해제하기 위한 해시 해제 함수 필요 시 구현
+    // hash_destroy를 이용하려면 destructor 함수 필요
+    // 일단 dummy로 NULL
+    hash_destroy(&spt->pages, NULL);
+    lock_release(&spt->spt_lock);
+}
+
+/* 페이지 조회 함수 구현 */
+struct suppl_page_table_entry *page_lookup(struct supplemental_page_table *spt, void *addr) {
+    return spt_lookup(spt, addr);
+}
+
+
+/* 페이지 로드 함수 구현 */
+
+bool load_page(struct suppl_page_table_entry *spte) {
+    /* 페이지의 가상 주소 정렬 */
+    void *upage = pg_round_down(spte->upage);
+
+    /* 메모리에 페이지 할당 */
+    void *kpage = palloc_get_page(PAL_USER | PAL_ZERO);
+    if (kpage == NULL)
+        return false;
+
+    /* 파일에서 페이지 읽기 */
+    if (spte->file != NULL) {
+        if (file_read_at(spte->file, kpage, spte->read_bytes, spte->offset) != (int) spte->read_bytes) {
+            palloc_free_page(kpage);
+            return false;
+        }
+        memset(kpage + spte->read_bytes, 0, spte->zero_bytes);
+    } else {
+        /* 제로 초기화 */
+        memset(kpage, 0, PGSIZE);
+    }
+
+    /* 페이지 디렉토리에 매핑 */
+    if (!pagedir_set_page(thread_current()->pagedir, upage, kpage, spte->writable)) {
+        palloc_free_page(kpage);
+        return false;
+    }
+
+    spte->is_loaded = true;
+    return true;
+}
+
+/* 스택 증가 함수 구현, 여기서는 dummy 구현 */
+bool grow_stack(void *fault_addr) {
+    // 스택 증가 로직 필요 (lazy allocation)
+    // 일단 테스트용으로 true 반환
+    return true;
+}
+

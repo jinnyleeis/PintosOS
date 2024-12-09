@@ -9,6 +9,8 @@
 
 #define FDT_MAX 128 
 
+#define FP_SHIFT_AMOUNT 14  /* Number of fractional bits */
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -17,6 +19,33 @@ enum thread_status
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
     THREAD_DYING        /* About to be destroyed. */
   };
+
+// 부동 소수점 연산 종류 enum 
+/* Fixed-point operations */
+typedef enum {
+    FP_ADD_OP,
+    FP_SUB_OP,
+    FP_MUL_INT_OP,
+    FP_DIV_INT_OP,
+    FP_MUL_OP,
+    FP_DIV_OP,
+    FP_ADD_INT_OP,
+    FP_SUB_INT_OP,
+    FP_INT_PART_OP,
+    FP_ROUND_OP,
+    FP_CONST_OP
+} fixed_point_op_t;
+
+// 스케줄링 모드 확인위한 enum 추가 
+// 기본이 priority임 
+typedef enum {
+    SCHEDULING_PRIORITY,    /* 우선순위 기반 스케줄러 */
+    SCHEDULING_MLFQS        /* 멀티레벨 피드백 큐 스케줄러 */
+} scheduling_mode_t;
+
+
+typedef int fixed_point_t; // mlfq에서 부동소수점 연산에 활용위해 추가
+
 
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
@@ -164,4 +193,15 @@ int thread_get_load_avg (void);
 // 새로 추가
 struct thread *get_thread_by_tid(tid_t tid);
 
+
+
+
+// 알람 클럭 함수들 
+void thread_sleep(int64_t ticks);
+void thread_awake(int64_t ticks);
+bool cmp_wake_up_time(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
+// 스케줄링 모드 명확하게 구분 위해 알맞게 동작할 수 있도록 하는 함수
+void thread_set_scheduling_mode(bool mlfqs);// set
+ 
 #endif /* threads/thread.h */

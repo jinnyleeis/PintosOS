@@ -1,4 +1,4 @@
-#include "threads/thread.h"
+yyyy#include "threads/thread.h"
 #include <debug.h>
 #include <stddef.h>
 #include <random.h>
@@ -25,7 +25,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
-
+struct list sleep_list;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -56,25 +56,26 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
+// 플젝3 ---------------------
+#ifndef USERPROG
+// project3 
+bool thread_prior_aging;
+#endif
+
+
+#ifndef USERPROG
+void thread_aging(void);
+#endif
+
+// 플젝3 ----------------------
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
+scheduling_mode_t current_scheduling_mode = SCHEDULING_PRIORITY;  /* 기본값: 우선순위 기반 */
 
-static void kernel_thread (thread_func *, void *aux);
-
-static void idle (void *aux UNUSED);
-static struct thread *running_thread (void);
-static struct thread *next_thread_to_run (void);
-static void init_thread (struct thread *, const char *name, int priority);
-static bool is_thread (struct thread *) UNUSED;
-static void *alloc_frame (struct thread *, size_t size);
-static void schedule (void);
-void thread_schedule_tail (struct thread *prev);
-static tid_t allocate_tid (void);
-// 새로 추가 
-struct thread *get_thread_by_tid(tid_t tid);
-
+// 계산 함수
 fixed_point_t fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B, fixed_point_t C);
 
 // 매크로
@@ -89,12 +90,54 @@ fixed_point_t fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B,
 #define FP_INT_PART(A) fixed_point_operation(FP_INT_PART_OP, (A), 0, 0)
 #define FP_ROUND(A) fixed_point_operation(FP_ROUND_OP, (A), 0, 0)
 #define FP_CONST(x) fixed_point_operation(FP_CONST_OP, (x), 0, 0)
+// 플젝3 새로 추가 프로토타입
+bool cmp_wake_up_time(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
+static void kernel_thread (thread_func *, void *aux);
+
+static void idle (void *aux UNUSED);
+static struct thread *running_thread (void);
+static struct thread *next_thread_to_run (void);
+static void init_thread (struct thread *, const char *name, int priority);
+static bool is_thread (struct thread *) UNUSED;
+static void *alloc_frame (struct thread *, size_t size);
+static void schedule (void);
+void thread_schedule_tail (struct thread *prev);
+static tid_t allocate_tid (void);
+// 새로 추가 
+struct thread *get_thread_by_tid(tid_t tid);
+void test_max_priority(void);
+
+// 플젝3 ----------------------
+#ifndef USERPROG
+/* 에이징을 통해 ready_list에 있는 모든 스레드의 우선순위를 증가시킴. */
+void thread_aging(void) {
+    struct list_elem *e;
+    struct thread *t;
+
+    /* ready_list를 순회 ->  각 스레드의 우선순위를 증가. */
+    for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)) {
+        t = list_entry(e, struct thread, elem);
+
+        /* 우선순위가 최대값을 넘지 않도록 함 */
+        if (t->priority < PRI_MAX) {
+            t->priority += 1;
+        }
+    }
+}
+#endif
+
+
 
 // 새로 추가 함수
 /* why? Pintos는 모든 스레드를 all_list라는 리스트로 관리하기 떄문에,
 특정 TID를 가진 스레드를 찾으려면 이 리스트를 순회해야한다. 
 process_execute(), process_wait(), exec(), wait() 등의 함수에서 자식 스레드를 찾을 때 사용함
 input : tid_t tid  - 찾고자 하는 스레드의 식별자
+
+
+
 해당 tid를 가진 스레드의 포인터를 반환
 */
 struct thread *get_thread_by_tid(tid_t tid)
@@ -135,7 +178,8 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-
+  // 플젝3 추가- 알람 클럭 관련
+  list_init (&sleep_list);  
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -180,7 +224,13 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
-}
+
+  //project3 
+   #ifndef USERPROG
+//	thread_wake_up();
+	if(thread_prior_aging==true){thread_aging();}
+   #endif
+   }
 
 /* Prints thread statistics. */
 void
@@ -252,6 +302,13 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+
+
+  // 선점 여부 확인 - 즉, 현재 만들어진것보다, 새로 만들어진게 더 우선순위 높으면
+  // 현재꺼 그만둘수 있게끔 한다!!
+  if (t->priority > thread_current()->priority)
+    thread_yield();
+
   return tid;
 }
 
@@ -288,7 +345,9 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+ // list_push_back (&ready_list, &t->elem);
+
+  list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -359,7 +418,9 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  //  list_push_back (&ready_list, &cur->elem);
+   list_insert_ordered(&ready_list, &cur->elem, cmp_priority, NULL);
+
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -386,7 +447,19 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+//  thread_current ()->priority = new_priority;
+if (current_scheduling_mode == SCHEDULING_MLFQS)return;
+  else if (current_scheduling_mode == SCHEDULING_PRIORITY)
+  {
+
+  enum intr_level old_level = intr_disable();
+  int old_priority = thread_current()->priority;
+  thread_current()->priority = new_priority;
+
+  if (new_priority < old_priority)
+    test_max_priority();
+
+  intr_set_level (old_level);}
 }
 
 /* Returns the current thread's priority. */
@@ -512,7 +585,18 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
+
+     if(current_scheduling_mode == SCHEDULING_PRIORITY){
+        t->priority = priority;
+      }
+      else if(current_scheduling_mode == SCHEDULING_MLFQS){
+      t->nice = thread_current() ? thread_current()->nice : 0;
+      t->recent_cpu = thread_current() ? thread_current()->recent_cpu : FP_CONST(0);
+//      calculate_priority(t, NULL);
+         
+   
+  }
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
@@ -667,6 +751,65 @@ allocate_tid (void)
   return tid;
 }
 
+
+// 프로젝트3을위한 각각의 함수들을 구현한 부분입니다!
+
+// 1. 
+// sleep list에서 더 일찍 깨어나야 하는 thread 순으로 정렬하기 위한 함수
+bool
+cmp_wake_up_time(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *t_a = list_entry(a, struct thread, elem);
+  struct thread *t_b = list_entry(b, struct thread, elem);
+  // a의 wake_up_time이 더 작으면 true
+  if(t_a->wake_up_time < t_b->wake_up_time)
+    return true;
+  else
+    return false;
+}
+
+
+// 우선순위 비교함수
+
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *t_a = list_entry(a, struct thread, elem);
+  struct thread *t_b = list_entry(b, struct thread, elem);
+if(t_a->priority > t_b->priority){
+    // 우선순위는 큰게 더 높은 것임 
+    return true;
+
+}else{
+    return false;
+}
+}
+
+
+/* Put the current thread to sleep until ticks */
+void
+thread_sleep(int64_t ticks)
+{
+  struct thread *cur = thread_current();
+  enum intr_level old_level;
+
+  ASSERT(!intr_context());
+  ASSERT(intr_get_level() == INTR_ON);
+
+  if (ticks <= 0)
+    return;
+
+  old_level = intr_disable();
+  cur->wake_up_time = ticks;
+  list_insert_ordered(&sleep_list, &cur->elem, cmp_wake_up_time, NULL);
+  thread_block();
+  intr_set_level(old_level);
+}
+
+
+
+// 3- mlfq를 위한 구현
+
+
 /* Fixed-point operation function */
 fixed_point_t
 fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B, fixed_point_t C)
@@ -712,8 +855,53 @@ fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B, fixed_point_t
     }
 }
 
+void
+thread_awake(int64_t current_ticks)
+{
+    /* 계속해서 sleep_list의 첫 번째 요소를 확인 */
+    while (!list_empty(&sleep_list)) {
+        struct thread *t = list_entry(list_front(&sleep_list), struct thread, elem);
+        
+        /* 현재 틱보다 작거나 같으면 해제 */
+        if (t->wake_up_time <= current_ticks) {
+            list_pop_front(&sleep_list);
+            thread_unblock(t);
+        }
+        else {
+            /* 첫 번째 요소가 조건을 만족하지 않으면 더 이상 검사할 필요 없음 */
+            break;
+        }
+    }
+}
+
+
+
+// 최대 우선순위 테스트 함수void
+void test_max_priority(void)
+{
+  
+  if (!list_empty(&ready_list))
+    {
+      struct thread *max_ready_t_ = list_entry(list_front(&ready_list), struct thread, elem);
+      if(thread_current()->priority < max_ready_t_->priority){thread_yield();}
+    }
+}
+
+
+
+/// 스케줄링 모드 set
+void thread_set_scheduling_mode(bool mlfqs) {
+    enum intr_level old_level = intr_disable();
+if(!mlfqs){
+    current_scheduling_mode = SCHEDULING_PRIORITY; }
+else{ current_scheduling_mode =SCHEDULING_MLFQS; }
+
+    intr_set_level(old_level);
+}
 
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+
