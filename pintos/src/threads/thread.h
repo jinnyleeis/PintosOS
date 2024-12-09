@@ -7,6 +7,10 @@
 #include "threads/synch.h"   // 세마포어 사용을 위해 추가
 #include "filesys/file.h"  // 추가: struct file의 정의를 포함
 
+
+#include "userprog/supplemental_page_table.h" // spt 정의를 위해 추가
+
+
 #define FDT_MAX 128 
 
 #define FP_SHIFT_AMOUNT 14  /* Number of fractional bits */
@@ -126,9 +130,13 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+    struct supplemental_page_table spt; // 추가: 각 스레드별 보조 페이지 테이블
+
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+
     int exit_status;                /* 종료 상태 */
     struct semaphore load_sema;     /* 로드 동기화를 위한 세마포어 */
     struct semaphore exit_sema;     /* 종료 동기화를 위한 세마포어 */

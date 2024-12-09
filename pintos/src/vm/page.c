@@ -100,8 +100,22 @@ page_install_zero(struct supplemental_page_table *spt, void *upage, bool writabl
   return true;
 }
 
+struct supplemental_page_table_entry *
+page_lookup(struct supplemental_page_table *spt, void *addr) {
+  void *upage = pg_round_down(addr);
+  struct supplemental_page_table_entry tmp;
+  tmp.upage = upage;
 
-/*
+  lock_acquire(&spt->spt_lock);
+  struct hash_elem *e = hash_find(&spt->pages, &tmp.hash_elem);
+  struct supplemental_page_table_entry *spte = NULL;
+  if (e != NULL)
+    spte = hash_entry(e, struct supplemental_page_table_entry, hash_elem);
+  lock_release(&spt->spt_lock);
+  return spte;
+}
+
+
 /* 스택 확장 함수 */
 /*
 bool grow_stack(void *fault_addr) {

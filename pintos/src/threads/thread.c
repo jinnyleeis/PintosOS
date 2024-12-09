@@ -11,9 +11,13 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+
+#include "vm/swap.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "threads/synch.h"   // 세마포어 사용을 위해 추가
+
 
 #endif
 
@@ -155,6 +159,10 @@ thread_start (void)
 
   /* Start preemptive thread scheduling. */
   intr_enable ();
+#ifdef VM
+frame_init();
+swap_init();
+#endif
 
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
