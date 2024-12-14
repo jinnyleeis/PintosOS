@@ -305,6 +305,7 @@ int wait(tid_t tid) {
 
 int read(int fd, void *buffer, unsigned size) {
     check_valid_buffer(buffer, size); // 버퍼 유효성 검사 추가
+//  pin_user_buffer(buffer, size, true); // true=writing to user memory
 
     struct thread *cur = thread_current();
     int bytes_read = 0;
@@ -338,6 +339,8 @@ int read(int fd, void *buffer, unsigned size) {
         bytes_read = -1; /* 잘못된 fd */
        
     }
+  //unpin_user_buffer(buffer, size);
+
      return bytes_read;
     
 }
