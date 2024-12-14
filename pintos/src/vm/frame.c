@@ -6,10 +6,6 @@
 #include <list.h>
 #include <stdio.h>
 #include "vm/page.h"
-
-
-
-
 #include "userprog/supplemental_page_table.h" // page_lookup, enum page_type 사용 위해 추가
 
 static struct list frame_table;

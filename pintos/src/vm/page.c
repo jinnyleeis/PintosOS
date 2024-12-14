@@ -99,7 +99,7 @@ page_install_zero(struct supplemental_page_table *spt, void *upage, bool writabl
 
   return true;
 }
-
+/*
 struct supplemental_page_table_entry *
 page_lookup(struct supplemental_page_table *spt, void *addr) {
   void *upage = pg_round_down(addr);
@@ -114,6 +114,7 @@ page_lookup(struct supplemental_page_table *spt, void *addr) {
   lock_release(&spt->spt_lock);
   return spte;
 }
+
 
 
 /* 스택 확장 함수 */

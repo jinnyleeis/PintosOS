@@ -18,7 +18,7 @@
 struct supplemental_page_table_entry *page_lookup(struct supplemental_page_table *spt, void *addr);
 
 /* 스택 확장 함수 */
-bool grow_stack(void *fault_addr);
+//bool grow_stack(void *fault_addr);
 
 /* Lazy Loading용 함수: page_install_file 등 */
 //bool page_install_file(struct supplemental_page_table *spt, struct file *file, off_t ofs,

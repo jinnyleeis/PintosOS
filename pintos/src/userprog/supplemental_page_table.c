@@ -89,7 +89,7 @@ bool page_load(struct supplemental_page_table_entry *spte) {
 }
 
 
-
+/*
 bool grow_stack(void *fault_addr) {
     struct supplemental_page_table *spt = &thread_current()->spt;
     void *upage = pg_round_down(fault_addr);
@@ -101,4 +101,19 @@ bool grow_stack(void *fault_addr) {
     bool success = page_install_zero(spt, upage, true);
     lock_release(&spt->spt_lock);
     return success;
+}
+*/
+
+bool
+grow_stack(void *fault_addr, void *esp) {
+  if ((uint8_t*)PHYS_BASE - (uint8_t*)fault_addr > 8*1024*1024)
+    return false;
+  if (fault_addr >= PHYS_BASE)
+    return false;
+  // stack page install
+  struct supplemental_page_table *spt = &thread_current()->spt;
+  lock_acquire(&spt->spt_lock);
+  bool ok = page_install_zero(spt, pg_round_down(fault_addr), true);
+  lock_release(&spt->spt_lock);
+  return ok;
 }

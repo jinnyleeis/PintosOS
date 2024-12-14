@@ -9,6 +9,8 @@
 #include "userprog/syscall.h"  // exit() 함수가 syscall.c에 정의되어 있음
 #include "threads/thread.h"    // thread_current()를 사용하기 위해 필요
 #include "userprog/pagedir.h"  // pagedir_get_page() 함수 선언 포함
+#include "vm/page.h" // page_install_zero 함수를 사용하기 위해 추가
+#include "userprog/supplemental_page_table.h"
 
 
 /* Number of page faults processed. */
@@ -133,6 +135,9 @@ page_fault (struct intr_frame *f)
   bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
 
+  struct thread *t = thread_current();
+
+
   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
      data.  It is not necessarily the address of the instruction
@@ -176,17 +181,33 @@ page_fault (struct intr_frame *f)
 
         
     }
-    
+
+//--- kernel 관련 fault 
+
+     void *esp = user ? f->esp : t->saved_esp; // user가 아니라 kernel에서 fault 났으면 t->saved_esp 활용
+  struct supplemental_page_table_entry *spte = page_lookup(&t->spt, fault_addr);
+
+  if (spte == NULL) {
+    // 스택 확장 시도
+    if (!grow_stack(fault_addr, esp)) {
+      t->wrong_exit = true;
+      exit(-1);
+    }
+  } else {
+    // spte 존재 -> load
+    if (write && !spte->writable) {
+      // 쓰기불가 페이지에 write 시도
+      t->wrong_exit = true;
+      exit(-1);
+    }
+    if (!page_load(spte)) {
+      t->wrong_exit = true;
+      exit(-1);
+    }
+  }
 
 
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
+
+
 }
 

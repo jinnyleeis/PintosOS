@@ -130,6 +130,7 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+    uint8_t *saved_esp;                     /* Saved stack pointer. */
     struct supplemental_page_table spt; // 추가: 각 스레드별 보조 페이지 테이블
 
 

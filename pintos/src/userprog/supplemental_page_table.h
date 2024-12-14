@@ -43,8 +43,8 @@ bool spt_less_func(const struct hash_elem *a, const struct hash_elem *b, void *a
 
 void spt_init(struct supplemental_page_table *spt);
 void spt_destroy(struct supplemental_page_table *spt);
-//struct supplemental_page_table_entry *page_lookup(struct supplemental_page_table *spt, void *addr);
+struct supplemental_page_table_entry *page_lookup(struct supplemental_page_table *spt, void *addr);
 bool page_load(struct supplemental_page_table_entry *spte);
-bool grow_stack(void *fault_addr);
-
+//bool grow_stack(void *fault_addr);
+bool grow_stack(void *fault_addr, void *esp);
 #endif /* USERPROG_SUPPLEMENTAL_PAGE_TABLE_H */
