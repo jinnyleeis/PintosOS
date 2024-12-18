@@ -3,211 +3,176 @@
 #include <stdio.h>
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
-#include <string.h>  
+#include "threads/vaddr.h"
+#include "userprog/syscall.h"
+#include "threads/thread.h"
+#include "userprog/pagedir.h"
+#include "threads/palloc.h"
+#include "threads/synch.h"
+#include "threads/malloc.h"
 
-#include "threads/vaddr.h"  // is_user_vaddr() 함수 정의를 포함
-#include "userprog/syscall.h"  // exit() 함수가 syscall.c에 정의되어 있음
-#include "threads/thread.h"    // thread_current()를 사용하기 위해 필요
-#include "userprog/pagedir.h"  // pagedir_get_page() 함수 선언 포함
-#include "vm/page.h" // page_install_zero 함수를 사용하기 위해 추가
-#include "userprog/supplemental_page_table.h"
+/* 프로젝트 요구 사항: stack growth 구현 관련 상수 정의 */
+#define MAX_STACK_SIZE (8 * 1024 * 1024)  // 8MB
 
-
-/* Number of page faults processed. */
 static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
 
-/* Registers handlers for interrupts that can be caused by user
-   programs.
+/* 스택 확장 함수 선언 */
+static bool try_grow_stack(void *fault_addr, void *esp);
 
-   In a real Unix-like OS, most of these interrupts would be
-   passed along to the user process in the form of signals, as
-   described in [SV-386] 3-24 and 3-25, but we don't implement
-   signals.  Instead, we'll make them simply kill the user
-   process.
-
-   Page faults are an exception.  Here they are treated the same
-   way as other exceptions, but this will need to change to
-   implement virtual memory.
-
-   Refer to [IA32-v3a] section 5.15 "Exception and Interrupt
-   Reference" for a description of each of these exceptions. */
 void
 exception_init (void) 
 {
-  /* These exceptions can be raised explicitly by a user program,
-     e.g. via the INT, INT3, INTO, and BOUND instructions.  Thus,
-     we set DPL==3, meaning that user programs are allowed to
-     invoke them via these instructions. */
   intr_register_int (3, 3, INTR_ON, kill, "#BP Breakpoint Exception");
   intr_register_int (4, 3, INTR_ON, kill, "#OF Overflow Exception");
-  intr_register_int (5, 3, INTR_ON, kill,
-                     "#BR BOUND Range Exceeded Exception");
+  intr_register_int (5, 3, INTR_ON, kill, "#BR BOUND Range Exceeded Exception");
 
-  /* These exceptions have DPL==0, preventing user processes from
-     invoking them via the INT instruction.  They can still be
-     caused indirectly, e.g. #DE can be caused by dividing by
-     0.  */
   intr_register_int (0, 0, INTR_ON, kill, "#DE Divide Error");
   intr_register_int (1, 0, INTR_ON, kill, "#DB Debug Exception");
   intr_register_int (6, 0, INTR_ON, kill, "#UD Invalid Opcode Exception");
-  intr_register_int (7, 0, INTR_ON, kill,
-                     "#NM Device Not Available Exception");
+  intr_register_int (7, 0, INTR_ON, kill, "#NM Device Not Available Exception");
   intr_register_int (11, 0, INTR_ON, kill, "#NP Segment Not Present");
   intr_register_int (12, 0, INTR_ON, kill, "#SS Stack Fault Exception");
   intr_register_int (13, 0, INTR_ON, kill, "#GP General Protection Exception");
   intr_register_int (16, 0, INTR_ON, kill, "#MF x87 FPU Floating-Point Error");
-  intr_register_int (19, 0, INTR_ON, kill,
-                     "#XF SIMD Floating-Point Exception");
+  intr_register_int (19, 0, INTR_ON, kill, "#XF SIMD Floating-Point Exception");
 
-  /* Most exceptions can be handled with interrupts turned on.
-     We need to disable interrupts for page faults because the
-     fault address is stored in CR2 and needs to be preserved. */
+  /* Page Fault 예외 처리 등록 */
   intr_register_int (14, 0, INTR_OFF, page_fault, "#PF Page-Fault Exception");
 }
 
-/* Prints exception statistics. */
 void
 exception_print_stats (void) 
 {
   printf ("Exception: %lld page faults\n", page_fault_cnt);
 }
 
-/* Handler for an exception (probably) caused by a user process. */
+/* 사용자 프로그램이 발생시킨 예외 처리 */
 static void
 kill (struct intr_frame *f) 
 {
-  /* This interrupt is one (probably) caused by a user process.
-     For example, the process might have tried to access unmapped
-     virtual memory (a page fault).  For now, we simply kill the
-     user process.  Later, we'll want to handle page faults in
-     the kernel.  Real Unix-like operating systems pass most
-     exceptions back to the process via signals, but we don't
-     implement them. */
-     
-  /* The interrupt frame's code segment value tells us where the
-     exception originated. */
   switch (f->cs)
     {
     case SEL_UCSEG:
-      /* User's code segment, so it's a user exception, as we
-         expected.  Kill the user process.  */
+      /* 유저 영역에서 예외 발생: 해당 프로세스 종료 */
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
       thread_exit (); 
 
     case SEL_KCSEG:
-      /* Kernel's code segment, which indicates a kernel bug.
-         Kernel code shouldn't throw exceptions.  (Page faults
-         may cause kernel exceptions--but they shouldn't arrive
-         here.)  Panic the kernel to make the point.  */
+      /* 커널 영역에서 예외 발생: 커널 패닉 */
       intr_dump_frame (f);
       PANIC ("Kernel bug - unexpected interrupt in kernel"); 
 
     default:
-      /* Some other code segment?  Shouldn't happen.  Panic the
-         kernel. */
+      /* 알 수 없는 세그먼트: 종료 */
       printf ("Interrupt %#04x (%s) in unknown segment %04x\n",
              f->vec_no, intr_name (f->vec_no), f->cs);
       thread_exit ();
     }
 }
 
-/* Page fault handler.  This is a skeleton that must be filled in
-   to implement virtual memory.  Some solutions to project 2 may
-   also require modifying this code.
-
-   At entry, the address that faulted is in CR2 (Control Register
-   2) and information about the fault, formatted as described in
-   the PF_* macros in exception.h, is in F's error_code member.  The
-   example code here shows how to parse that information.  You
-   can find more information about both of these in the
-   description of "Interrupt 14--Page Fault Exception (#PF)" in
-   [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
+/* 페이지 폴트 처리 함수 */
 static void
 page_fault (struct intr_frame *f) 
 {
-  bool not_present;  /* True: not-present page, false: writing r/o page. */
-  bool write;        /* True: access was write, false: access was read. */
-  bool user;         /* True: access by user, false: access by kernel. */
-  void *fault_addr;  /* Fault address. */
-
+  bool not_present;  
+  bool write;        
+  bool user;         
+  void *fault_addr;  
   struct thread *t = thread_current();
 
-
-  /* Obtain faulting address, the virtual address that was
-     accessed to cause the fault.  It may point to code or to
-     data.  It is not necessarily the address of the instruction
-     that caused the fault (that's f->eip).
-     See [IA32-v2a] "MOV--Move to/from Control Registers" and
-     [IA32-v3a] 5.15 "Interrupt 14--Page Fault Exception
-     (#PF)". */
+  /* 잘못된 주소 획득 */
   asm ("movl %%cr2, %0" : "=r" (fault_addr));
-
-  /* Turn interrupts back on (they were only off so that we could
-     be assured of reading CR2 before it changed). */
-  intr_enable ();
-
-  /* Count page faults. */
+  intr_enable ();  /* 인터럽트 다시 활성화 */
   page_fault_cnt++;
 
-  /* Determine cause. */
-  not_present = (f->error_code & PF_P) == 0;
+  /* 에러 코드 파싱 */
+  not_present = (f->error_code & PF_P) == 0; 
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  
+  /* 유저/커널 모드에 따라 스택 포인터 결정 */
+  void *esp = user ? f->esp : t->saved_esp;
+  if (esp == NULL)
+    esp = f->esp; // 혹은 적절히 커널에서 esp 추적하도록
 
- // 잘못된 메모리 접근 시 종료, 중복 종료 방지
-    if (!is_user_vaddr(fault_addr) || pagedir_get_page(thread_current()->pagedir, fault_addr) == NULL) {
-        
-            
-            thread_current()->exited = true;
-
-
-         // suppress_exit_msg 플래그 확인
-    if (!thread_current()->suppress_exit_msg) {
-        printf("%s: exit(-1)\n", thread_current()->name);
-    }
-
-           thread_current()->wrong_exit = true;
-
-
-            exit(-1);
-            
-
-        
-    }
-
-//--- kernel 관련 fault 
-
-     void *esp = user ? f->esp : t->saved_esp; // user가 아니라 kernel에서 fault 났으면 t->saved_esp 활용
-  struct supplemental_page_table_entry *spte = page_lookup(&t->spt, fault_addr);
-
-  if (spte == NULL) {
-    // 스택 확장 시도
-    if (!grow_stack(fault_addr, esp)) {
-      t->wrong_exit = true;
-      exit(-1);
-    }
-  } else {
-    // spte 존재 -> load
-    if (write && !spte->writable) {
-      // 쓰기불가 페이지에 write 시도
-      t->wrong_exit = true;
-      exit(-1);
-    }
-    if (!page_load(spte)) {
-      t->wrong_exit = true;
-      exit(-1);
-    }
+  /* 유효한 사용자 주소인지 검사 */
+  if (!is_user_vaddr(fault_addr)) {
+    t->wrong_exit = true;
+    exit(-1);
   }
 
-
-
-
+  /* 페이지가 없는 경우(not_present)일 때 스택 확장 시도 */
+  // 현재는 lazy load나 spt를 구현하지 않았으므로 fault_addr에 대한 매핑이 없으면 스택 확장만 고려
+  // pt-grow-bad를 위해 esp에서 4096바이트 이상 떨어진 경우도 처리
+  if (not_present) {
+    // 스택 확장 가능성 체크
+    // 만약 stack growth 조건 불충족 시 종료
+    if (!try_grow_stack(fault_addr, esp)) {
+      // 확장 불가한 경우 -1 종료
+      t->wrong_exit = true;
+      exit(-1);
+    }
+    return; // 성공적으로 스택 확장 후 반환
+  } else {
+    // 존재하지만 write 금지 페이지를 write하려고 하는 등 권한 문제 발생 시 종료
+    t->wrong_exit = true;
+    exit(-1);
+  }
 }
 
+/* 스택 확장 시도 함수 
+   조건:
+   - fault_addr < PHYS_BASE
+   - fault_addr >= esp - 32 (푸시 명령용)
+   - esp보다 4096바이트 이상 아래이면(pt-grow-bad 대비) 안됨
+   - 최대 8MB 스택 제한 준수 */
+static bool
+try_grow_stack(void *fault_addr, void *esp) {
+  if (fault_addr == NULL)
+    return false;
+
+  // 스택 pointer와의 거리 계산
+  // fault_addr가 esp보다 낮은 주소를 접근하는데 
+  // 그 차이가 4096바이트(4KB) 이상이면 pt-grow-bad 테스트 실패 → false 리턴
+  if ((uint32_t)esp > (uint32_t)fault_addr && (uint32_t)esp - (uint32_t)fault_addr > 4096) {
+    return false;
+  }
+
+  // fault_addr가 esp - 32보다 작으면 stack 확장 불필요한 접근으로 간주
+  if ((uint32_t)fault_addr < (uint32_t)esp - 32) {
+    return false;
+  }
+
+  // 최대 8MB 제한: PHYS_BASE - 8MB <= fault_addr < PHYS_BASE 범위 내여야 함
+  void *limit = (void *)((uint8_t *)PHYS_BASE - MAX_STACK_SIZE);
+  if (fault_addr < limit) {
+    return false; 
+  }
+
+  // 페이지 경계로 맞춤
+  void *page_addr = pg_round_down(fault_addr);
+
+  // 이미 매핑된 페이지가 아닌지 확인
+  if (pagedir_get_page(thread_current()->pagedir, page_addr) != NULL) {
+    // 이미 페이지가 존재 -> 굳이 새로 확장할 필요 없음(하지만 여기 왔다는건 not_present였으니 예외적)
+    return false;
+  }
+
+  // 새로운 페이지 할당
+  uint8_t *kpage = palloc_get_page(PAL_USER | PAL_ZERO);
+  if (kpage == NULL)
+    return false;
+
+  // 할당한 페이지를 user 페이지 테이블에 매핑
+  if (!pagedir_set_page(thread_current()->pagedir, page_addr, kpage, true)) {
+    palloc_free_page(kpage);
+    return false;
+  }
+
+  return true;
+}
