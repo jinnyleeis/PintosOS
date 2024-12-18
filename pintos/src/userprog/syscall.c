@@ -209,6 +209,7 @@ void halt(void) {
     shutdown_power_off(); // 시스템 종료
 }
 
+/*
 void exit(int status){
 
  struct thread *cur = thread_current();
@@ -228,10 +229,13 @@ if(!cur->wrong_exit && !cur->suppress_exit_msg){
 
 
      /* 부모 스레드가 자식의 종료를 기다리는 경우, 종료를 알림 */
-      sema_up(&cur->exit_sema);
+//      sema_up(&cur->exit_sema);
 
        /* 부모가 자식을 정리할 때까지 대기 */
        // 자식이 자기가 대기시한다는거임
+
+
+/*
  if (cur->parent != NULL) {
         sema_down(&cur->wait_sema);
     }
@@ -248,6 +252,31 @@ if(!cur->wrong_exit && !cur->suppress_exit_msg){
     }
 
 
+}*/
+
+
+void exit(int status){
+
+ struct thread *cur = thread_current();
+
+    /* 항상 메시지 출력 */
+    printf("%s: exit(%d)\n", thread_name(), status);
+
+    /* 자식 프로세스가 exit_sema를 기다리고 있을 수 있으므로 */
+    if (!cur->exited) {
+        cur->exited = true;
+        cur->exit_status = status;
+
+        /* 부모에게 자식의 종료 알림 */
+        sema_up(&cur->exit_sema);
+
+        /* 부모가 wait을 호출할 수 있도록 대기 */
+        if (cur->parent != NULL) {
+            sema_down(&cur->wait_sema);
+        }
+    }
+
+    thread_exit();
 }
 
 int write(int fd, const void *buffer, unsigned length) {
