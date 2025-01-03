@@ -173,6 +173,7 @@ lock 관련 함수도 많이 사용하였다.
 ![image](https://github.com/user-attachments/assets/67c45236-57a0-4c2e-b18c-fc36857fb416)
 
 이전에 유저 프로그램 프로젝트를 개발 하였을때는, exit시, 형식이 프로그램명 : exit(-1)이 아니라, syscall.c 내 exit의 특정 조건에서는 프로그램명 : ext(-1) 형식으로 어디선 그냥 exit 형식으로.. 등등 다양하게 출력되도록 구현하였었다. 하지만, 이로 인해 테스트 케이스가 실패하여 테스트 케이스의 형식을 맞추기 위해, 무조건적으로 위와 같이 출력되도록 수정하였다. 
+
 <img width="451" alt="image" src="https://github.com/user-attachments/assets/c5c98722-933b-4982-8ea5-02735aea1ebd" />
 
 <img width="375" alt="image" src="https://github.com/user-attachments/assets/af93083a-dfad-4fe3-835a-b6f3ba303f06" />
@@ -184,6 +185,5 @@ lock 관련 함수도 많이 사용하였다.
 <img width="386" alt="image" src="https://github.com/user-attachments/assets/98e4a05b-316c-4df2-b464-87d570ab59f4" />
 
 
-시험 및 평가 내용
-(채점 대상 테스트 케이스에 해당하는) make check 수행 결과를 캡처하여 첨부
+
 
