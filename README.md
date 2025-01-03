@@ -6,7 +6,7 @@
 
 [3. thread - 테스트용2-추가 브랜치에서 개발](#pintos-project-3-threads)
 
-4. virtual memory - feature/exit-message 브랜치에서 개발
+> 4. virtual memory - feature/exit-message 브랜치에서 개발
 
 # Pintos Project 1: User Program (1)
 
@@ -1001,6 +1001,8 @@ void calculate_load_avg(void): load_avg 값을  재계산)하도록 추가
 
 그리고 load_avg를 계산하기 위해선 레디 스레드 리스트의 크기도 필요하므로(현재 실행 스레드는 이들이 아니면 포함), 이를 위해 list_size 리스트 내장 함수를 이용하였다. 
 thread_tick 함수 thread_tick() 함수에서 매 틱마다 mlfq의 우선순위 계산에 필요한 업데이트를 수행할 수 있도록 하였다. 스케줄링 모드가 mlfq일떄에만 이러한 업데이트가 필요한 것이므로, current schedulig모드로 스케줄링 모드가 어떤것에 해당하는지 switch - case문으로 조사할 수 있도록 하였다. mlfq 모드일 때,  매 틱마다 업데이트가 필요한 update_recent_cpu(t); 함수를 호출하였고, 매 1초마다 업데이트가 필요한 load_avg값과, recent_cpu 값은,  (ticks % TIMER_FREQ == 0) 이 조건을 만족시켰을 때에만 업데이트가 될 수 있도록 했다. 그리고,  매 타임 슬라이스마다 재계산 되어야 하는 우선순위는 (ticks % TIME_SLICE == 0 이 조건을 만족시켰을 때에만,   update_priority_and_yield(); 이 함수가 호출될 수 있도록 했다. 
+
+
 
 
 static void update_recent_cpu(struct thread *t)-> 매 틱마다 실행 중인 스레드의 recent_cpu를 업데이트(증가)시킬 수 있도록 추가 
