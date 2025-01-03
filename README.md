@@ -766,4 +766,4 @@ make check 수행 결과를 캡처하여 첨부
 ![image](https://github.com/user-attachments/assets/f99cb04f-3a92-4b4d-91a9-3528f84fb544)
 
 
-#pintos-project-3-threads
+#pintos project 3 threads
