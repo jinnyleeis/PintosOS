@@ -217,38 +217,55 @@ fixed_point_t fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B,
 
 
 void calculate_priority(struct thread *t, void *aux UNUSED) : thread의 우선순위를 mlfqs의 우선순위 계산 규칙에따라 계산할 수 있도록 구현한 함수로, 
+![image](https://github.com/user-attachments/assets/72215fd9-2aa5-44d5-9353-3e64c913caec)
 
 
 이 우선순위 공식을 위에서 작성한 고정 소수점 연산 매크로를 이용해 구현하였다. 그리고, 우선순위가 범위를 넘으면 안되기 떄문에, 우선순위가 PRI_MIN과 PRI_MAX 사이에 있도록 검사도 진행하였다. 
 
+<img width="451" alt="image" src="https://github.com/user-attachments/assets/2128c11e-9ca5-4d4d-97fd-baa6625c00de" />
 
 void calculate_recent_cpu(struct thread *t, void *aux UNUSED) : recent cpu 값을 업데이트할 수 있도록 추가
 
+![image](https://github.com/user-attachments/assets/aeb557ab-e07b-483d-9b43-6230fb859f1f)
 
 
 이 공식이 적용되어 recent_cpu의 값이 계산될 수 있도록 했다. 
+![image](https://github.com/user-attachments/assets/a4d6c30e-3507-4596-9a97-24ea60635da0)
 
 void calculate_load_avg(void): load_avg 값을  재계산)하도록 추가
+![image](https://github.com/user-attachments/assets/59830d9a-6c58-4feb-b378-9f05bc433f5d)
 
 이 공식을 통해, load_avg의 값이 계산될 수 있도록 했다. 
+![image](https://github.com/user-attachments/assets/ed2493e1-11b4-43bf-bdaa-e08b77ae4d21)
 
 그리고 load_avg를 계산하기 위해선 레디 스레드 리스트의 크기도 필요하므로(현재 실행 스레드는 이들이 아니면 포함), 이를 위해 list_size 리스트 내장 함수를 이용하였다. 
 thread_tick 함수 thread_tick() 함수에서 매 틱마다 mlfq의 우선순위 계산에 필요한 업데이트를 수행할 수 있도록 하였다. 스케줄링 모드가 mlfq일떄에만 이러한 업데이트가 필요한 것이므로, current schedulig모드로 스케줄링 모드가 어떤것에 해당하는지 switch - case문으로 조사할 수 있도록 하였다. mlfq 모드일 때,  매 틱마다 업데이트가 필요한 update_recent_cpu(t); 함수를 호출하였고, 매 1초마다 업데이트가 필요한 load_avg값과, recent_cpu 값은,  (ticks % TIMER_FREQ == 0) 이 조건을 만족시켰을 때에만 업데이트가 될 수 있도록 했다. 그리고,  매 타임 슬라이스마다 재계산 되어야 하는 우선순위는 (ticks % TIME_SLICE == 0 이 조건을 만족시켰을 때에만,   update_priority_and_yield(); 이 함수가 호출될 수 있도록 했다. 
+
+![image](https://github.com/user-attachments/assets/0a3d065d-d220-4463-ab9d-640256bda9e5)
 
 
 
 
 static void update_recent_cpu(struct thread *t)-> 매 틱마다 실행 중인 스레드의 recent_cpu를 업데이트(증가)시킬 수 있도록 추가 
 
+<img width="451" alt="image" src="https://github.com/user-attachments/assets/b8657c42-0476-4c19-8430-6f25c64c4329" />
+
 static void update_load_avg_and_recent_cpu(void) ->  매초마다, 모든 스레드의 recent_cpu와 load_avg를 재계산할 수 있도록 호출하기 위해 추가 thread_foreach를 사용해서, 실행 중인 스레드가 아닌, 모든 thread의 recent_cpu와 load_avg를 업데이트할 수 있도록 했다. 
+<img width="451" alt="image" src="https://github.com/user-attachments/assets/2bb8ed9c-3b24-422a-9eaf-f9a1b57294fa" />
+
 
 static void update_priority_and_yield(void) -> 매 time_slice 매크로에 해당하는 틱마다, 모든 스레드의 우선순위를 재계산하도록 추가했다. 
+![image](https://github.com/user-attachments/assets/dd3c2028-a450-4c68-8507-f0296439311b)
 
 
 
 void thread_set_scheduling_mode(bool mlfqs) 함수  추가 : 스케줄링 모드가 우선순위 모드 한가지만 있는 것이 아니므로, 각각의 모드대로 알맞은 동작을 수행할 수 있도록 해당 함수 추가 
+<img width="451" alt="image" src="https://github.com/user-attachments/assets/a64d8fa3-2b50-4fc0-9eee-59a5158f56d7" />
+
 
 현재 스케줄링 모드를 나타내는 열거형 scheduling_mode_t를 추가했고, 디폴트 값은 priority mode로 설정하였다. thread_set_scheduling_mode(bool mlfqs) 함수에서, init.c에서 mlfqs 커널 옵션에 따라 스케줄링 모드를 설정할 수 있도록 이 함수를 호출했다. 
+<img width="451" alt="image" src="https://github.com/user-attachments/assets/8d15493d-0bb3-4e44-90d2-541697db44de" />
+
 
 이후에, thread 관련 코드에서 어떤 모드인지 확인하기 위해선 current_scheudling_mode의 enum 값이 무엇인지 확인하여 구분했다. 
 
@@ -261,12 +278,14 @@ void thread_set_scheduling_mode(bool mlfqs) 함수  추가 : 스케줄링 모드
 
 
 init_thread 함수
+<img width="451" alt="image" src="https://github.com/user-attachments/assets/9b8cf084-b1ca-4cc1-8cb0-77277a6f90c8" />
 
 thread_init 함수에서, 스케줄링 모드에 따라 사용되는 적절한 값이 초기화될 수 있도록 했다. 
 그리고mlfq 모드에서  만약, 초기 스레드라면, nice값은 0, recent_cpu의 값은 0이 되도록 초기화 했고, 만약, initial thread가 아닌 경우라면, 현재 해당 스레드의 구조체에 담긴 기존의 nice, recent_cpu의 값을 활용할 수 있도록 했다.
 그리고 이러한 값을 기반으로, priortiy를 calculate 할 수 있도록 호출했다. 추가적으로, load_avg 값의 초기화는 thread_start에서 0으로 진행하였다. 
 
 thread_set_nice, thread_get_nice
+<img width="451" alt="image" src="https://github.com/user-attachments/assets/fa6681a6-6add-465c-936b-5ad75a4266cc" />
 
 먼저, set nice 함수를 호출하면,, 해당 thread에 인자로 전달된 nice value를 할당하고, nice 값이 우선순위 계산 공식에 변수로 포함되므로, 이에 따라 calculate_priority를 호출해서 현재 실행중인 스레드의 우선순위를 재계산하도록 했다. 또한, ready_list를,  재정렬 하고, 만약, 이렇게 재계산한 값에 따라, 선점이 진행되어야 할 수 있으므로, test_max_prirotiy를 호출하였다. 그리고 thread_get_nice 함수는 이를 호출하면, 해당 스레드의 nice 값을 조회할 수 있도록 수정했다. 
 
@@ -280,21 +299,27 @@ sleep list ready list를 관리할 수 있도록 List_entry,list_insert_ordered(
 ### 이슈 : 우선순위 기반 스케줄링을 Pintos에 구현하는 과정에서 priority-sema 테스트 케이스가 초기에는 실패한 문제
 처음에는 Synch.c. 파일 내의 sema up/down 함수를 수정해야 한다는 것을 생각하지 못하였다. 하지만, priority-sema 테스트 케이스 코드를 보니, sema up과 sema down을 호출하고 있는 것을 확인하였다. 이를 통해, 분석을 해본 결과, 이 테스트 케이스는 여러 스레드가 세마포어를 기다릴 때, 우선순위가 높은 스레드가 먼저 깨어나고 실행되도록 하는지 확인하기 위해 설계된 것을 확인할 수 있었다. 하지만, 수정 전의  세마포어는 우선순위에 따라 세마포어의 wait가 관리되는 것이 아닌, 먼저 대기한 스레드가 먼저 깨어나는 방식으로 구현되어 있었다. 즉, 수정 전의 코드를 보면,  원래의 sema_down 함수는 list_push_back을 사용하여 대기 스레드를 리스트의 뒤에 추가했으므로, 우선순위가 높은 스레드가 먼저 깨어날 수 있는 구조가 아니었다. 이에 따라, 낮은 우선순위의 스레드가 먼저 깨어나게 되어 priority-sema 테스트 케이스가 실패하게된 것이였다. 따라서, 이 문제를 해결하기 위해, 세마포어의 대기자 리스트를 스레드의 우선순위에 따라 정렬되도록 수정하였다. 구체적으로, sema_down 함수에서 list_push_back 대신 list_insert_ordered를 사용하여 스레드를 우선순위 순으로 삽입하고, sema_up 함수에서도 우선순위에 따라 스레드를 언블록하도록 변경하였다. 또한, 이 케이스에서는 선점이 발생할 수도 있는 케이스이므로, 스레드가 언블록될 때 현재 스레드보다 우선순위가 높은 스레드가 있는지 검사하여 필요한 경우 CPU를 yield 할 수 있도록,  test_max_priority 함수를 호출하였다. 이를 통해 해당 테스트 케이스도 통과될 수 있게 되었다. 
 #### <before>
+![image](https://github.com/user-attachments/assets/430b8d13-2bdd-4948-b293-88b9f7e6d5bf)
 
 
 #### <after>
+![image](https://github.com/user-attachments/assets/458fa174-0438-4364-8787-70e44b7f8db2)
 
 
+![image](https://github.com/user-attachments/assets/b2f39060-2872-486e-87e6-7973d5be3f17)
 
 
 ## 시험 및 평가 내용
 ### priority-lifo.c 코드 및 priority-lifo 테스트 결과 분석
 priority-lifo.c는 스레드 스케줄링의 우선순위 기반 LIFO(Last-In-First-Out) 정책을 테스트하기 위한 코드이다. 코드를 살펴보면,  즉, 스레드 ID가 생성된 시점을 나타내며, 가장 나중에 생성된 스레드가 가장 높은 우선순위를 가지도록 설정됨을 알 수 있다. 
+![image](https://github.com/user-attachments/assets/37bb8dda-9f82-4ee8-91df-b1bc86762988)
 
 이런식으로 생성된 순서에 따라 스레드에 우선순위를 부여하기 때문에, lifo 정책을 검증할 수 있는 것이다. 아래의 테스트 결과를 보면, 스레드가 생성된 순서와 반대로 실행됨을 확인할 수 있다. 즉, lifo 정책이 잘 동작함을 확인할 수 있다. 
+![image](https://github.com/user-attachments/assets/e71d77ee-ea0a-4f24-87bd-8fd17cf987b9)
 
 
 
 ### make check 수행 결과를 캡처하여 첨부
 
-
+![image](https://github.com/user-attachments/assets/cfa2a772-1955-4fbc-9421-b16d66536c2f)
+나머지 8가지 테스트케이스는 구현 범위가 아니므로, 구현하지 않았습니다. 
