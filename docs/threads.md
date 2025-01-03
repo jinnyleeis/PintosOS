@@ -312,11 +312,11 @@ sleep list ready list를 관리할 수 있도록 List_entry,list_insert_ordered(
 
 ### 이슈 : 우선순위 기반 스케줄링을 Pintos에 구현하는 과정에서 priority-sema 테스트 케이스가 초기에는 실패한 문제
 처음에는 Synch.c. 파일 내의 sema up/down 함수를 수정해야 한다는 것을 생각하지 못하였다. 하지만, priority-sema 테스트 케이스 코드를 보니, sema up과 sema down을 호출하고 있는 것을 확인하였다. 이를 통해, 분석을 해본 결과, 이 테스트 케이스는 여러 스레드가 세마포어를 기다릴 때, 우선순위가 높은 스레드가 먼저 깨어나고 실행되도록 하는지 확인하기 위해 설계된 것을 확인할 수 있었다. 하지만, 수정 전의  세마포어는 우선순위에 따라 세마포어의 wait가 관리되는 것이 아닌, 먼저 대기한 스레드가 먼저 깨어나는 방식으로 구현되어 있었다. 즉, 수정 전의 코드를 보면,  원래의 sema_down 함수는 list_push_back을 사용하여 대기 스레드를 리스트의 뒤에 추가했으므로, 우선순위가 높은 스레드가 먼저 깨어날 수 있는 구조가 아니었다. 이에 따라, 낮은 우선순위의 스레드가 먼저 깨어나게 되어 priority-sema 테스트 케이스가 실패하게된 것이였다. 따라서, 이 문제를 해결하기 위해, 세마포어의 대기자 리스트를 스레드의 우선순위에 따라 정렬되도록 수정하였다. 구체적으로, sema_down 함수에서 list_push_back 대신 list_insert_ordered를 사용하여 스레드를 우선순위 순으로 삽입하고, sema_up 함수에서도 우선순위에 따라 스레드를 언블록하도록 변경하였다. 또한, 이 케이스에서는 선점이 발생할 수도 있는 케이스이므로, 스레드가 언블록될 때 현재 스레드보다 우선순위가 높은 스레드가 있는지 검사하여 필요한 경우 CPU를 yield 할 수 있도록,  test_max_priority 함수를 호출하였다. 이를 통해 해당 테스트 케이스도 통과될 수 있게 되었다. 
-#### <before>
+#### before
 ![image](https://github.com/user-attachments/assets/430b8d13-2bdd-4948-b293-88b9f7e6d5bf)
 
 
-#### <after>
+#### after
 ![image](https://github.com/user-attachments/assets/458fa174-0438-4364-8787-70e44b7f8db2)
 
 
