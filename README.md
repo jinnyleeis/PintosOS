@@ -4,7 +4,7 @@
 
 [2. User Program 2 - 테스트용2-추가 브랜치에서 개발](#pintos-project-2-user-program-2)
 
-[3. thread - 테스트용2-추가 브랜치에서 개발](#pintos-project-3-threads)
+[3. thread - 테스트용2-추가 브랜치에서 개발](#pintos-project-3-threads)
 
 4. virtual memory - feature/exit-message 브랜치에서 개발
 
