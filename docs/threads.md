@@ -72,42 +72,44 @@ threads/thread.h
 threads/thread.c
 
 ##### 수정하거나 추가해야 하는 자료구조
-thread.h의 struct thread 자료 구조 내에 수정 사항들 
- alarm clock 구현을 위해서, wake_up_time 변수를 추가
-MLFQS를 위해 nice와 recent_cpu를 추가
-sleep_list 자료구조 추가 
-sleep 중의 스레드를 관리하는 전역 리스트 - wake_up_time 순으로 정렬
-scheuling mode 관리를 위한 enum 자료구조 추가
-부동 소수점 연산 종류 enum 자료 구조 추가 
-fixed_point_t: 고정소수점 연산을 위해 정의
-thread.c에 매크로로, fixed_point_operation() 함수를 호출하여 연산 매크로를 구현함 
+1. thread.h의 struct thread 자료 구조 내에 수정 사항들
+- alarm clock 구현을 위해서, wake_up_time 변수를 추가
+- MLFQS를 위해 nice와 recent_cpu를 추가
+- sleep_list 자료구조 추가 
+- sleep 중의 스레드를 관리하는 전역 리스트 - wake_up_time 순으로 정렬
+- scheuling mode 관리를 위한 enum 자료구조 추가
+- 부동 소수점 연산 종류 enum 자료 구조 추가 
+- fixed_point_t: 고정소수점 연산을 위해 정의
+
+2. thread.c에 매크로로, fixed_point_operation() 함수를 호출하여 연산 매크로를 구현함 
 
 ##### 수정하거나 추가해야 하는 함수 - alarm clock 관련해서 
-void thread_sleep(int64_t ticks) : timer sleep함수에서 호출해서  current ticks를 통해, wake up time을 설정하고, thread를 블록시킬 함수 추가 
-void thread_awake(int64_t current_ticks) : 슬립 시간이 경과한 스레드를 깨울 함수 추가 
-bool cmp_wake_up_time : sleep_list를 wake_up_time에 따라 정렬하기 위한 비교 기준으로 사용하기 위해 추가
-timer_interrupt() 수정 : busy wating -> thread_awake(ticks)를 호출해서 스레드를 효율적으로 꺠울 수 있도록 수정 
-수정하거나 추가해야 하는 함수 - priority scheduling 관련해서 
-bool cmp_priority 함수 추가 : ready_list를 스레드 우선순위에 따라 정렬하기 위해 추가 
-void test_max_priority(void) 추가 : 현재 running thread가 yield해야 하는지 검사를 위해 추가
-void thread_unblock (struct thread *); 함수 수정 : 우선순위에 따라 ready_list에 추가할 수 있도록 수정
-void sema_down(struct semaphore *sema) 수정 : wait list에 추가될때도 우선순위에 정렬되도록 
-void sema_up(struct semaphore *sema) 수정 : wait list에 가장 높은 우선순위의 스레드가 unblock되도록
- thread_aging(void) 함수 추가 
-thread_start, thread_yield 수정
-thread_set_priority, thread_get_prirority 수정
-init_thread 함수, thread_start 함수 수정
+- void thread_sleep(int64_t ticks) : timer sleep함수에서 호출해서  current ticks를 통해, wake up time을 설정하고, thread를 블록시킬 함수 추가 
+- void thread_awake(int64_t current_ticks) : 슬립 시간이 경과한 스레드를 깨울 함수 추가 
+- bool cmp_wake_up_time : sleep_list를 wake_up_time에 따라 정렬하기 위한 비교 기준으로 사용하기 위해 추가
+- timer_interrupt() 수정 : busy wating -> thread_awake(ticks)를 호출해서 스레드를 효율적으로 꺠울 수 있도록 수정 
+
+##### 수정하거나 추가해야 하는 함수 - priority scheduling 관련해서 
+- bool cmp_priority 함수 추가 : ready_list를 스레드 우선순위에 따라 정렬하기 위해 추가 
+- void test_max_priority(void) 추가 : 현재 running thread가 yield해야 하는지 검사를 위해 추가
+- void thread_unblock (struct thread *); 함수 수정 : 우선순위에 따라 ready_list에 추가할 수 있도록 수정
+- void sema_down(struct semaphore *sema) 수정 : wait list에 추가될때도 우선순위에 정렬되도록 
+- void sema_up(struct semaphore *sema) 수정 : wait list에 가장 높은 우선순위의 스레드가 unblock되도록
+- thread_aging(void) 함수 추가 
+- thread_start, thread_yield 수정
+- thread_set_priority, thread_get_prirority 수정
+- init_thread 함수, thread_start 함수 수정
 
 ##### 수정하거나 추가해야하는 함수 - ADVANCED SCHEULDER 관련해서 
-fixed_point_t fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B, fixed_point_t C)  : 정된 연산 타입에 따라 필요한 여러 고정소수점 연산을 수행할 수 있도록 구현
-void calculate_priority(struct thread *t, void *aux UNUSED) : thread의 우선순위를 mlfqs의 우선순위 계산 규칙에따라 계산할 수 있도록 구현
-void calculate_recent_cpu(struct thread *t, void *aux UNUSED) : recent cpu 값을 업데이트할 수 있도록 추가
-void calculate_load_avg(void): load_avg 값을  재계산)하도록 추가
-static void update_recent_cpu(struct thread *t)-> 매 틱마다 실행 중인 스레드의 recent_cpu를 업데이트(증가)시킬 수 있도록 추가 
-static void update_load_avg_and_recent_cpu(void) ->  매초마다, 모든 스레드의 recent_cpu와 load_avg를 재계산할 수 있도록 호출하기 위해 추가
-static void update_priority_and_yield(void) -> 매 time_slice 매크로에 해당하는 틱마다, 모든 스레드의 우선순위를 재계산하도록 추가 
-void thread_set_scheduling_mode(bool mlfqs) 함수  추가 : 스케줄링 모드가 우선순위 모드 한가지만 있는 것이 아니므로, 각각의 모드대로 알맞은 동작을 수행할 수 있도록 해당 함수 추가 
-thread_set_nice (int nice UNUSED) , thread_get_nice (int nice UNUSED) 
+- fixed_point_t fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B, fixed_point_t C)  : 정된 연산 타입에 따라 필요한 여러 고정소수점 연산을 수행할 수 있도록 구현
+- void calculate_priority(struct thread *t, void *aux UNUSED) : thread의 우선순위를 mlfqs의 우선순위 계산 규칙에따라 계산할 수 있도록 구현
+- void calculate_recent_cpu(struct thread *t, void *aux UNUSED) : recent cpu 값을 업데이트할 수 있도록 추가
+- void calculate_load_avg(void): load_avg 값을  재계산)하도록 추가
+- static void update_recent_cpu(struct thread *t)-> 매 틱마다 실행 중인 스레드의 recent_cpu를 업데이트(증가)시킬 수 있도록 추가 
+- static void update_load_avg_and_recent_cpu(void) ->  매초마다, 모든 스레드의 recent_cpu와 load_avg를 재계산할 수 있도록 호출하기 위해 추가
+- static void update_priority_and_yield(void) -> 매 time_slice 매크로에 해당하는 틱마다, 모든 스레드의 우선순위를 재계산하도록 추가 
+- void thread_set_scheduling_mode(bool mlfqs) 함수  추가 : 스케줄링 모드가 우선순위 모드 한가지만 있는 것이 아니므로, 각각의 모드대로 알맞은 동작을 수행할 수 있도록 해당 함수 추가 
+- thread_set_nice (int nice UNUSED) , thread_get_nice (int nice UNUSED) 
 
 
 ## 연구 결과
@@ -194,9 +196,11 @@ void sema_up(struct semaphore *sema) 수정 : wait list에 가장 높은 우선�
 
 우선순위가 높은 스레드가 cpu를 독점하는 것을 막기 위해, aging 함수를 구현했는데, 이는, ready_list에 있는 모든 스레드의 우선순위를 최대값이 넘지 않는 선에서 증가할 수 있도록 하는 역할을 한다. 
 이는 매틱마다 timer_interrupt 함수에서 호출되는
+
 ![image](https://github.com/user-attachments/assets/76de5d02-7030-458e-af8d-9f28d4e4327b)
 
  thread_tick 함수에서 호출되어, 만약 aging의 값이 true면, ready list의 스레드들의 우선순위가 매틱마다 증가될 수 있도록 했다. 
+ 
 ![image](https://github.com/user-attachments/assets/0c61541d-246b-4fbc-8121-0d3633582197)
 
 또한, thread_start 내에서도, 현재 스레드보다, 새로 create된 스레드의 우선순위가 높으면, yield 함수를 호출해서 선점이 가능하도록 함수를 수정했다. 
@@ -205,6 +209,7 @@ void sema_up(struct semaphore *sema) 수정 : wait list에 가장 높은 우선�
 thread_yield내에서도, yield한 스레드가 ready list에 삽입될 때, 우선 순위 순으로 삽입될 수 있도록 list_push_back 함수를 사용하던 부분을, -> list_insert_ordered와 cmp_pirority 비교자 함수를 사용하는 것으로 변경하였다. 
 
 ![image](https://github.com/user-attachments/assets/c5745330-64ef-4d9f-8b03-2d669498be4e)
+
 
 ![image](https://github.com/user-attachments/assets/cbae2bcc-1fb8-4ed8-a91a-26ae6036ef4e)
 
@@ -217,6 +222,7 @@ fixed_point_t fixed_point_operation(fixed_point_op_t op, fixed_point_t A, int B,
 
 
 void calculate_priority(struct thread *t, void *aux UNUSED) : thread의 우선순위를 mlfqs의 우선순위 계산 규칙에따라 계산할 수 있도록 구현한 함수로, 
+
 ![image](https://github.com/user-attachments/assets/72215fd9-2aa5-44d5-9353-3e64c913caec)
 
 
@@ -230,12 +236,15 @@ void calculate_recent_cpu(struct thread *t, void *aux UNUSED) : recent cpu 값�
 
 
 이 공식이 적용되어 recent_cpu의 값이 계산될 수 있도록 했다. 
+
 ![image](https://github.com/user-attachments/assets/a4d6c30e-3507-4596-9a97-24ea60635da0)
 
 void calculate_load_avg(void): load_avg 값을  재계산)하도록 추가
+
 ![image](https://github.com/user-attachments/assets/59830d9a-6c58-4feb-b378-9f05bc433f5d)
 
 이 공식을 통해, load_avg의 값이 계산될 수 있도록 했다. 
+
 ![image](https://github.com/user-attachments/assets/ed2493e1-11b4-43bf-bdaa-e08b77ae4d21)
 
 그리고 load_avg를 계산하기 위해선 레디 스레드 리스트의 크기도 필요하므로(현재 실행 스레드는 이들이 아니면 포함), 이를 위해 list_size 리스트 내장 함수를 이용하였다. 
@@ -251,10 +260,12 @@ static void update_recent_cpu(struct thread *t)-> 매 틱마다 실행 중인 �
 <img width="451" alt="image" src="https://github.com/user-attachments/assets/b8657c42-0476-4c19-8430-6f25c64c4329" />
 
 static void update_load_avg_and_recent_cpu(void) ->  매초마다, 모든 스레드의 recent_cpu와 load_avg를 재계산할 수 있도록 호출하기 위해 추가 thread_foreach를 사용해서, 실행 중인 스레드가 아닌, 모든 thread의 recent_cpu와 load_avg를 업데이트할 수 있도록 했다. 
+
 <img width="451" alt="image" src="https://github.com/user-attachments/assets/2bb8ed9c-3b24-422a-9eaf-f9a1b57294fa" />
 
 
 static void update_priority_and_yield(void) -> 매 time_slice 매크로에 해당하는 틱마다, 모든 스레드의 우선순위를 재계산하도록 추가했다. 
+
 ![image](https://github.com/user-attachments/assets/dd3c2028-a450-4c68-8507-f0296439311b)
 
 
@@ -264,6 +275,7 @@ void thread_set_scheduling_mode(bool mlfqs) 함수  추가 : 스케줄링 모드
 
 
 현재 스케줄링 모드를 나타내는 열거형 scheduling_mode_t를 추가했고, 디폴트 값은 priority mode로 설정하였다. thread_set_scheduling_mode(bool mlfqs) 함수에서, init.c에서 mlfqs 커널 옵션에 따라 스케줄링 모드를 설정할 수 있도록 이 함수를 호출했다. 
+
 <img width="451" alt="image" src="https://github.com/user-attachments/assets/8d15493d-0bb3-4e44-90d2-541697db44de" />
 
 
@@ -278,6 +290,7 @@ void thread_set_scheduling_mode(bool mlfqs) 함수  추가 : 스케줄링 모드
 
 
 init_thread 함수
+
 <img width="451" alt="image" src="https://github.com/user-attachments/assets/9b8cf084-b1ca-4cc1-8cb0-77277a6f90c8" />
 
 thread_init 함수에서, 스케줄링 모드에 따라 사용되는 적절한 값이 초기화될 수 있도록 했다. 
@@ -285,6 +298,7 @@ thread_init 함수에서, 스케줄링 모드에 따라 사용되는 적절한 �
 그리고 이러한 값을 기반으로, priortiy를 calculate 할 수 있도록 호출했다. 추가적으로, load_avg 값의 초기화는 thread_start에서 0으로 진행하였다. 
 
 thread_set_nice, thread_get_nice
+
 <img width="451" alt="image" src="https://github.com/user-attachments/assets/fa6681a6-6add-465c-936b-5ad75a4266cc" />
 
 먼저, set nice 함수를 호출하면,, 해당 thread에 인자로 전달된 nice value를 할당하고, nice 값이 우선순위 계산 공식에 변수로 포함되므로, 이에 따라 calculate_priority를 호출해서 현재 실행중인 스레드의 우선순위를 재계산하도록 했다. 또한, ready_list를,  재정렬 하고, 만약, 이렇게 재계산한 값에 따라, 선점이 진행되어야 할 수 있으므로, test_max_prirotiy를 호출하였다. 그리고 thread_get_nice 함수는 이를 호출하면, 해당 스레드의 nice 값을 조회할 수 있도록 수정했다. 
