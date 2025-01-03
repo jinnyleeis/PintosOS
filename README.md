@@ -1,7 +1,7 @@
 # 운영체제 2024-2 수업에서 개발한 핀토스 프로젝트(개발 기간 9월-12월) 
 
-[1. user program 1 - 테스트용2-추가 브랜치에서 개발](# Pintos Project 1: User Program (1))
-[2. user program 2 - 테스트용2-추가 브랜치에서 개발](# Pintos Project 2: User Program (2))
+[1. user program 1 - 테스트용2-추가 브랜치에서 개발](#Pintos Project 1: User Program (1))
+[2. user program 2 - 테스트용2-추가 브랜치에서 개발](#Pintos Project 2: User Program (2))
 3. thread - 테스트용2-추가 브랜치에서 개발
 4. virtual memory - feature/exit-message 브랜치에서 개발
 
