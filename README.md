@@ -3,7 +3,9 @@
 [1. User Program 1 - 테스트용2-추가 브랜치에서 개발](#pintos-project-1-user-program-1)
 
 [2. User Program 2 - 테스트용2-추가 브랜치에서 개발](#pintos-project-2-user-program-2)
-3. thread - 테스트용2-추가 브랜치에서 개발
+
+[3. thread - 테스트용2-추가 브랜치에서 개발](#pintos-project-3-threads)
+
 4. virtual memory - feature/exit-message 브랜치에서 개발
 
 # Pintos Project 1: User Program (1)
@@ -764,4 +766,4 @@ make check 수행 결과를 캡처하여 첨부
 ![image](https://github.com/user-attachments/assets/f99cb04f-3a92-4b4d-91a9-3528f84fb544)
 
 
-
+#pintos-project-3-threads
